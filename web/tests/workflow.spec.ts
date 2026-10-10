@@ -5,6 +5,30 @@ import path from 'node:path';
 const testDb = path.resolve('..', 'db', 'pmw-smoke-run.sqlite');
 const db = () => new DatabaseSync(testDb, { readOnly: true });
 
+test('survey conflict cards show verified values and respect regional visibility', async ({ page, context }) => {
+  const con = db();
+  try {
+    const row = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G70' AND kind='market_conflict' AND title LIKE 'Front%'").get() as { id: string; title: string };
+    expect(row).toBeTruthy();
+    for (const region of ['ALL', 'CN', 'EU']) {
+      await context.addCookies([{ name: 'pmw_region', value: region, url: 'http://127.0.0.1:3107' }]);
+      await page.goto(`/vehicles/G70?req=${row.id}`);
+      await expect(page.getByRole('heading', { name: row.title, exact: true })).toBeVisible();
+      const ladder = page.locator('section').filter({ has: page.getByRole('heading', { name: 'From customer voice to requirement', exact: true }) });
+      await expect(ladder.getByText(/China 7.69 vs Europe 9.69 \/ 10/)).toBeVisible();
+      await expect(ladder.getByText(/2025 vehicle sales shares: CN 23.8%, EU 31.0%/)).toBeVisible();
+      const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
+      await expect(evidence.locator('li')).toHaveCount(0);
+    }
+    await page.screenshot({ path: 'test-results/market-conflict-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: 'test-results/market-conflict-mobile.png', fullPage: true });
+    await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
+    await page.goto(`/vehicles/G70?req=${row.id}`);
+    await expect(page.getByRole('heading', { name: row.title, exact: true })).toHaveCount(0);
+  } finally { con.close(); }
+});
+
 test('equipment quick win displays only its matching wishing comments', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const con = db();

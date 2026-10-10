@@ -18,7 +18,12 @@ export type SurveyRow = {
   gap: number;
 };
 
-export type Conflict = { vehicle: string; attribute: string; cn: number; eu: number; delta: number };
+export type Conflict = {
+  vehicle: string; attribute: string; cn: number; eu: number; delta: number;
+  study?: "CN_EU_2025";
+  sales_year?: number;
+  sales_weights?: Record<string, number | null>;
+};
 
 export type Challenge = {
   issues: { penalty: number; text: string }[];

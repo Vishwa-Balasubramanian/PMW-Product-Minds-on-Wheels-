@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS requirements (
   uncertainties TEXT NOT NULL,     -- JSON list
   contradictions TEXT NOT NULL,    -- JSON list
   survey TEXT NOT NULL,            -- JSON list of survey evidence rows
-  conflicts TEXT NOT NULL,         -- JSON list of market conflicts that touch this requirement
+  conflicts TEXT NOT NULL,         -- JSON conflicts; market candidates add study, sales_year, sales_weights
   priority INTEGER NOT NULL,       -- 0..100, deterministic
   priority_factors TEXT NOT NULL,  -- JSON {factor: {value, weight, note}}
   confidence INTEGER NOT NULL,     -- 0..100, deterministic, separate from priority
