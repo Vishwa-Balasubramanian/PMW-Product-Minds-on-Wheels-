@@ -33,6 +33,13 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_vehicle ON feedback(vehicle, market);
 
+-- Raw comments and BMW labels stay untouched; text exclusions have readable reasons.
+CREATE TABLE IF NOT EXISTS feedback_scope (
+  feedback_id TEXT PRIMARY KEY,
+  in_scope INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
+
 -- One row per label: a comment can carry several (topic, type) labels.
 CREATE TABLE IF NOT EXISTS feedback_labels (
   feedback_id TEXT NOT NULL,
@@ -144,6 +151,14 @@ CREATE TABLE IF NOT EXISTS signal_evidence (
   role TEXT NOT NULL               -- supports | contradicts
 );
 
+-- Complete negative-comment membership; signal_evidence is only a bounded display sample.
+CREATE TABLE IF NOT EXISTS signal_feedback (
+  signal_id TEXT NOT NULL,
+  feedback_id TEXT NOT NULL,
+  PRIMARY KEY (signal_id, feedback_id)
+);
+CREATE INDEX IF NOT EXISTS idx_signal_feedback_comment ON signal_feedback(feedback_id);
+
 CREATE TABLE IF NOT EXISTS requirements (
   id TEXT PRIMARY KEY,             -- R-G70-001
   vehicle TEXT NOT NULL,
@@ -167,7 +182,7 @@ CREATE TABLE IF NOT EXISTS requirements (
   uncertainties TEXT NOT NULL,     -- JSON list
   contradictions TEXT NOT NULL,    -- JSON list
   survey TEXT NOT NULL,            -- JSON list of survey evidence rows
-  conflicts TEXT NOT NULL,         -- JSON list of market conflicts that touch this requirement
+  conflicts TEXT NOT NULL,         -- JSON conflicts; market candidates add study, sales_year, sales_weights
   evidence_mix TEXT,               -- JSON {observed, survey, inferred, assumed}, sums to 1; NULL before backfill
   evidence_mix_by_market TEXT NOT NULL DEFAULT '{}', -- JSON market -> same mix, computed from that market's evidence
   priority INTEGER NOT NULL,       -- 0..100, deterministic
@@ -207,8 +222,8 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 PIPELINE_TABLES = [
-    "vehicles", "feedback", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
-    "data_issues", "representation", "market_conflicts", "signals", "signal_evidence",
+    "vehicles", "feedback", "feedback_scope", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
+    "data_issues", "representation", "market_conflicts", "signals", "signal_evidence", "signal_feedback",
     "requirements", "audit_events", "settings",
 ]
 

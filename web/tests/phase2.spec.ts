@@ -82,7 +82,7 @@ test('portfolio scrolls inside its table at 375px and every vehicle link opens s
   await scroll.focus();
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => scroll.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
-  await scroll.evaluate(el => { el.scrollLeft = 0; });
+  await scroll.evaluate(el => { el.scrollLeft = 0; el.blur(); document.querySelector('main')!.scrollTop = 0; });
   await page.screenshot({ path: 'test-results/phase2-portfolio-375.png' });
   for (const code of ['F70', 'G60', 'G70']) {
     await page.getByTestId('portfolio-heatmap').locator(`a[href="/vehicles/${code}?view=signals"]`).first().click();

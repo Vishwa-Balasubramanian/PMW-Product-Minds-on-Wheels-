@@ -19,7 +19,7 @@ async function expectNoOverflow(page: import('@playwright/test').Page) {
 test('portfolio shows real program totals and regional availability', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Portfolio overview' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Portfolio' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Portfolio', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: /Open requirements for/ })).toHaveCount(3);
   await expectNoOverflow(page);
   await page.screenshot({ path: 'test-results/workspace-portfolio-desktop.png' });

@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from . import derive, evidence, evidence_mix, score
+from . import derive, evidence, evidence_mix, market_requirements, score
 from .config import RAW, SALES_FILE, STUDY_FILE, VEHICLES
 from .themes import THEME_VERSION, member_topics
 
@@ -66,6 +66,8 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
                 errors.append(f"{r['id']}: missing or inconsistent evidence composition")
             if r['kind'] == 'quick_win':
                 errors.extend(equipment_errors(con, r))
+            elif r['kind'] == 'market_conflict':
+                errors.extend(market_requirements.errors(con, r))
             else:
                 allowed = {row[0] for row in con.execute('SELECT feedback_id FROM signal_evidence WHERE signal_id=?', (r['signal_id'],))}
                 draft = {k: json.loads(r[k]) if k in ('assumptions', 'uncertainties') else r[k] for k in derive.FIELDS}
@@ -104,7 +106,8 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
             'comments': con.execute('SELECT COUNT(*) FROM feedback WHERE vehicle=?', (code,)).fetchone()[0],
             'labelled_comments_by_source': labels, 'unlabelled': unlabelled,
             'requirements': len(reqs), 'core_requirements': len(core),
-            'equipment_quick_wins': len(reqs) - len(core),
+            'equipment_quick_wins': len(quick_wins),
+            'market_conflict_requirements': sum(r['kind'] == 'market_conflict' for r in reqs),
             'core_quadrants': {q: sum(r['quadrant'] == q for r in core) for q in quadrants},
             'quadrants': quadrants, 'equipment_entries_best_effort': equipment,
             'draft_sources': sorted({r['generated_by'] for r in reqs}),
@@ -117,6 +120,15 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
         }
     if con.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
         errors.append('SQLite integrity check failed')
+    for row in con.execute('SELECT s.id FROM signals s LEFT JOIN signal_feedback f ON f.signal_id=s.id '
+                           'GROUP BY s.id HAVING COUNT(f.feedback_id) != s.n_negative'):
+        errors.append(f'{row[0]}: full negative-comment membership differs from the signal count')
+    if con.execute('SELECT 1 FROM signal_evidence e JOIN feedback_scope x ON x.feedback_id=e.feedback_id '
+                   'WHERE x.in_scope=0 LIMIT 1').fetchone():
+        errors.append('Text-excluded feedback leaked into requirement evidence')
+    if con.execute("SELECT 1 FROM equipment_matches m,json_each(m.feedback_ids) fid "
+                   "JOIN feedback_scope x ON x.feedback_id=fid.value WHERE x.in_scope=0 LIMIT 1").fetchone():
+        errors.append('Text-excluded feedback leaked into equipment matches')
     files = [SALES_FILE, STUDY_FILE] + [v[k] for v in VEHICLES.values() for k in ('feedback_file','options_file')]
     return {'passed': not errors, 'errors': errors, 'theme_version': THEME_VERSION, 'weights': weights,
             'data_sha256': {name: hashlib.sha256((RAW/name).read_bytes()).hexdigest() for name in sorted(files)},

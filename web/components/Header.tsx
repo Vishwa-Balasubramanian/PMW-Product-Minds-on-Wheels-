@@ -34,7 +34,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
     return (
       <>
         <Link href="/" className="workspace-brand" onClick={() => drawer.current?.close()} aria-label="PMW portfolio">
-          <span><span className="brand-symbol"><span className="text-blue">P</span>MW</span><span className="mt-1 block text-[10px] text-ink-3">Product Manager&apos;s Workbench</span></span>
+          <span><span className="brand-symbol"><span className="text-blue">P</span>MW</span><span className="mt-1 block text-[10px] text-ink-3">Product Minds on Wheels</span></span>
         </Link>
         {mobile && <button className="drawer-close" onClick={() => drawer.current?.close()} aria-label="Close navigation">×</button>}
         <nav aria-label={mobile ? "Mobile navigation" : "Main"} className="workspace-nav">

@@ -71,6 +71,7 @@ def build_equipment_matches(con, vehicle: str) -> None:
         feedback = con.execute(
             "SELECT DISTINCT f.id, f.text, l.topic, l.feedback_type FROM feedback f JOIN feedback_labels l ON l.feedback_id=f.id "
             f"WHERE f.vehicle=? AND l.topic IN ({','.join('?' for _ in topics)}) "
+            "AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=f.id AND x.in_scope=0) "
             "AND l.feedback_type IN ('Wants','Difficult to Use','Defect')",
             (vehicle, *topics)).fetchall()
         if not feedback:
@@ -175,9 +176,33 @@ TOPIC_TO_SURVEY: dict[str, dict[str, list[str]]] = {
     "Center console, front": {"us": ["Interior storage"], "cneu": ["Interior storage for small items"]},
     "Wheels / tires": {"us": ["Appearance of tires/ wheels"], "cneu": []},
     "Intelligent Personal Assistant": {"us": ["Performance of voice recognition"], "cneu": []},
-    "Rear seat entertainment": {"us": [], "cneu": ["Rear interior roominess"]},
+    # No question specifically tests the rear entertainment system. Roominess is not a proxy.
     "Automatic doors": {"us": ["Ease of front seat entry"], "cneu": ["Ease of entry into and out of car"]},
     "Instrument cluster": {"us": ["Instrument panel"], "cneu": ["Easy to read and use instruments"]},
+    "Exterior": {"us": ["Overall exterior styling"], "cneu": ["Exterior styling"]},
+    "Exterior rearview mirror": {"us": ["Rear visibility"], "cneu": ["All round visibility"]},
+    "Door, open / close": {"us": ["Exterior door handles", "Interior door handles", "Sound of doors"],
+                          "cneu": ["Ease of entry into and out of car"]},
+    "non-contact trunk lid opening": {"us": ["Trunk lid/ tailgate and liftgate operations"],
+                                     "cneu": ["Ease of loading/ unloading luggage"]},
+    "Transmission": {"us": ["Smoothness of transmission"], "cneu": []},
+    "USB port": {"us": ["Phone charging"], "cneu": []},
+    "My Modes / driving experience": {"us": ["If applicable: Ease of customization"], "cneu": []},
+}
+
+# Deliberate gaps: do not attach a vaguely related question merely to fill a card.
+# F70 has only the CN/EU study; US-only mappings cannot create evidence for it.
+SURVEY_COVERAGE_GAPS = {
+    "Public charging / external providers": "No study question measures public charger availability or operation.",
+    "Charge high-voltage battery": "No study question measures high-voltage battery charging usability.",
+    "Vehicle key": "No study question directly measures key operation.",
+    "Vehicle, lock / unlock": "Door entry measures do not establish locking or keyless-operation problems.",
+    "Rear seat entertainment": "No question specifically measures rear entertainment; cabin roominess is unrelated.",
+    "F70:Audio mode, sound": "No sound-system question in the F70 CN/EU study; no F70 US study supplied.",
+    "F70:USB port": "No port or charging question in the F70 study.",
+    "F70:Wheels / tires": "No wheel/tire appearance question in the F70 study.",
+    "F70:Driver assistance, automated driving, overall technology": "No assistance-usability question in the F70 study.",
+    "F70:Transmission": "No transmission-smoothness question in the F70 study.",
 }
 
 
@@ -219,6 +244,24 @@ def sales_shares(con, vehicle: str, year: int) -> dict[str, float]:
     rows = con.execute("SELECT market, volume FROM sales WHERE vehicle = ? AND year = ?", (vehicle, year)).fetchall()
     total = sum(r["volume"] for r in rows) or 1
     return {r["market"]: r["volume"] / total for r in rows}
+
+
+def record_survey_coverage(con, vehicle: str, top: int = 15) -> None:
+    """Make deliberate gaps visible without manufacturing a survey proxy."""
+    rows = con.execute('SELECT topic FROM signals WHERE vehicle=? AND in_scope=1 AND n_negative>0 '
+                       'ORDER BY n_negative DESC,topic LIMIT ?', (vehicle, top)).fetchall()
+    missing = []
+    for row in rows:
+        topic = row['topic']
+        if survey_for_topic(con, vehicle, topic):
+            continue
+        reason = SURVEY_COVERAGE_GAPS.get(f'{vehicle}:{topic}', SURVEY_COVERAGE_GAPS.get(topic,
+                 'No reviewed question in the supplied studies directly covers this customer task.'))
+        missing.append(topic)
+        db.issue(con, 'survey coverage', 'info', f'No survey evidence for {topic}.', reason, vehicle)
+    db.audit(con, actor_type='system', actor='Survey mapper', entity_type='dataset', entity_id=vehicle,
+             action='checked core survey coverage', after=f'{len(rows)-len(missing)} of {len(rows)} core themes mapped',
+             rationale='Unmapped tasks remain comment-only: ' + ', '.join(missing))
 
 
 def build_representation(con, vehicle: str) -> None:

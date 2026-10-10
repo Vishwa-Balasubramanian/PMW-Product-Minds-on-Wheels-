@@ -44,7 +44,8 @@ def profiles(con) -> dict[str, dict[str, dict[str, float]]]:
     """One batched scan of source labels, not the bounded prompt/quote sample."""
     by_theme = defaultdict(dict)
     feedback = {r["id"]: dict(r) for r in con.execute("SELECT id, market, vehicle FROM feedback")}
-    labels = con.execute("SELECT feedback_id, topic, label_source FROM feedback_labels WHERE topic IS NOT NULL")
+    labels = con.execute("SELECT feedback_id, topic, label_source FROM feedback_labels l WHERE topic IS NOT NULL "
+                         "AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=l.feedback_id AND x.in_scope=0)")
     provisional_ids = set()
     for label in labels:
         f = feedback[label["feedback_id"]]
@@ -64,6 +65,9 @@ def profiles(con) -> dict[str, dict[str, dict[str, float]]]:
             ids = {fid for m in json.loads(req["already_exists"]) for fid in m["feedback_ids"]}
             comments = [{**feedback[fid], "topics": set(), "provisional": fid in provisional_ids}
                         for fid in sorted(ids) if fid in feedback and feedback[fid]["vehicle"] == req["vehicle"]]
+        elif req["kind"] == "market_conflict":
+            # These candidates intentionally have no comment-derived signal.
+            comments = []
         else:
             comments = list(by_theme[(req["vehicle"], topics[req["signal_id"]])].values())
         survey = json.loads(req["survey"])

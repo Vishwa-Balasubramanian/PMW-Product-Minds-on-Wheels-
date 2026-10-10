@@ -5,6 +5,43 @@ import path from 'node:path';
 const testDb = path.resolve('..', 'db', 'pmw-smoke-run.sqlite');
 const db = () => new DatabaseSync(testDb, { readOnly: true });
 
+test('survey conflict cards show verified values and respect regional visibility', async ({ page, context }) => {
+  const con = db();
+  try {
+    const row = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G70' AND kind='market_conflict' AND title LIKE 'Front%'").get() as { id: string; title: string };
+    expect(row).toBeTruthy();
+    for (const region of ['ALL', 'CN', 'EU']) {
+      await context.addCookies([{ name: 'pmw_region', value: region, url: 'http://127.0.0.1:3107' }]);
+      await page.goto(`/vehicles/G70?req=${row.id}`);
+      await expect(page.getByRole('heading', { name: row.title, exact: true })).toBeVisible();
+      const ladder = page.locator('section').filter({ has: page.getByRole('heading', { name: 'From customer voice to requirement', exact: true }) });
+      await expect(ladder.getByText(/China 7.69 vs Europe 9.69 \/ 10/)).toBeVisible();
+      await expect(ladder.getByText(/2025 vehicle sales shares: CN 23.8%, EU 31.0%/)).toBeVisible();
+      await expect(page.getByTestId('evidence-meter').locator('[data-part=observed]')).toHaveAttribute('data-value', '0');
+      await expect(page.getByTestId('evidence-meter').locator('[data-part=survey]')).not.toHaveAttribute('data-value', '0');
+      await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
+      const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
+      await expect(evidence.locator('li')).toHaveCount(0);
+    }
+    await page.screenshot({ path: 'test-results/market-conflict-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: 'test-results/market-conflict-mobile.png', fullPage: true });
+    await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
+    await page.goto(`/vehicles/G70?req=${row.id}`);
+    await expect(page.getByRole('heading', { name: row.title, exact: true })).toHaveCount(0);
+  } finally { con.close(); }
+});
+
+test('data health explains text exclusions and deliberate survey gaps', async ({ page, context }) => {
+  await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
+  await page.goto('/vehicles/G60?view=data');
+  await expect(page.getByText(/comments (excluded|also contain an out-of-scope remark):/).first()).toBeVisible();
+  await expect(page.getByText(/No survey evidence for/).first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/scope-data-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.screenshot({ path: 'test-results/scope-data-mobile.png', fullPage: true });
+});
+
 test('equipment quick win displays only its matching wishing comments', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const con = db();
@@ -21,9 +58,13 @@ test('equipment quick win displays only its matching wishing comments', async ({
     expect(r.title).toContain('7VB');
     await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Customer evidence', exact: true })).toBeVisible();
+    await expect(page.locator('article img').first()).toHaveAttribute('alt', 'Seats');
     const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
     const shownIds = await evidence.locator('li .font-mono').allTextContents();
     expect(shownIds.sort()).toEqual(ids);
+    await page.screenshot({ path: 'test-results/requirement-photo-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: 'test-results/requirement-photo-mobile.png', fullPage: true });
   } finally { con.close(); }
 });
 

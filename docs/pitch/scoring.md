@@ -77,6 +77,17 @@ truth fractions. Each market is computed independently, so China's observed port
 Surveys may disagree with the draft; their direction belongs in the agreement score and evidence panel. Editing
 the prose does not validate the hypothesis or change the draft's underlying provenance.
 
+## Survey-only market-conflict candidates
+
+The merged market-conflict builder uses the same weight sets but a separate, explicit factor mapping because
+these candidates have no comment signal. Impact is the largest of the two survey gaps; frequency, quantity and
+competitive pressure are zero (unknown, not invented). Market relevance and representation use the combined
+**2025** CN/EU sales share. Future relevance is 0.45, source diversity and agreement are each 0.25, and recency is
+0.5. Challenge subtracts 8 for unknown sample sizes and 6 for absent comment triangulation. The evidence meter
+counts only the supplied survey rows plus inference and successor assumptions, even for the all-markets viewer.
+See [market_requirements.py](../../pipeline/pmw/market_requirements.py). Their scores are review prompts, not
+evidence that CN and EU need different products.
+
 Implementation: [score.py](../../pipeline/pmw/score.py), [evidence_mix.py](../../pipeline/pmw/evidence_mix.py),
 [web score parity](../../web/lib/score.ts), [audit actions](../../web/lib/actions.ts).
 Live Anthropic generation was skipped for this delivery because no key was configured. Reviewed templates remain

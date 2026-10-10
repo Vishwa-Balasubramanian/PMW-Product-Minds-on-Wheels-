@@ -32,14 +32,28 @@ After pulling changes to `pipeline/pmw/db.py`, rebuild: the build drops and recr
 Equipment matches stay within the feature's allowed topics. Only `Wants` comments support option, package or
 cross-vehicle offers; complaints about standard equipment are marked `standard_but_failing`.
 Each vehicle keeps its 15 signal requirements plus up to five quick wins, ranked by distinct wishing comment IDs.
+G60 and G70 also include their three strongest in-scope China/Europe survey conflicts, with explicit market values,
+2025 sales shares and limited evidence confidence. These cards do not invent customer comments.
 Quick wins name the feature and option/package code or source vehicle, and use their own comments and scores.
 Comment IDs are the available counting unit; the source data does not identify unique people across comments.
 
 Schema update: `equipment_matches.feature` identifies the feature; the placeholder `equipment.trim` column was
 removed. Rebuild the database before running the updated app.
 
+Phase 2 adds `signal_feedback` (full negative-comment membership for live approval coverage) and `feedback_scope`
+(readable text exclusions). Rebuild before using this branch. The async `happiness(viewer, vehicle)` gate function
+returns authorized markets only and `share: null` when evidence is missing; the meter UI can consume it.
+Implementation notes: [Happiness data](docs/HAPPINESS_DATA.md), [survey and scope](docs/SURVEY_AND_SCOPE.md),
+[photos](docs/REQUIREMENT_PHOTOS.md), and [pitch data traps](docs/pitch/data-traps.md).
+
+Vishwa Phase 2 adds a region-aware evidence/assumption meter and `/portfolio`, a theme-by-vehicle heatmap with
+aggregate counts only. The additive `requirements.evidence_mix` and `evidence_mix_by_market` columns can be
+backfilled without replacing decisions: back up the existing database, then run `uv run pmw evidence-mix` from
+`pipeline`. A full rebuild is still needed to regenerate upstream source changes. See the [Phase 2 delivery and
+migration notes](docs/PHASE2_VISHWA.md) and [scoring pitch](docs/pitch/scoring.md).
+
 Regression checks: `cd pipeline && uv run --extra llm python -m unittest discover -s tests -v`, then
-`cd ../web && node --test scripts/test-equipment-evidence.mjs scripts/test-score.mjs && npx tsc --noEmit && npm run build`.
+`cd ../web && node --test scripts/test-equipment-evidence.mjs scripts/test-happiness.mjs scripts/test-score.mjs && npx tsc --noEmit && npm run build`.
 Run `npm run test:e2e` after building; it uses a separate copy of the local database.
 
 **Priority display:** the list is grouped MoSCoW-style by priority score: Must have 65+, Should have 55+, Could have 45+,

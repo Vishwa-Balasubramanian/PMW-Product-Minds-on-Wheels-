@@ -18,7 +18,7 @@ export function EvidenceMeter({ mix, region }: { mix: EvidenceMix | null; region
   }
   const label = PARTS.map((p, i) => `${p.label} ${percentages[i]}%`).join(", ");
   return (
-    <section aria-label="Evidence composition" className="m-4 rounded-lg border border-line bg-surface p-4 sm:m-6" data-testid="evidence-meter">
+    <section aria-label="Evidence composition" className="m-4 rounded-lg border border-line bg-mist p-4 sm:m-6" data-testid="evidence-meter">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="eyebrow">Evidence &amp; assumptions</h3>
         <span className="text-[11px] text-ink-3">{region}</span>

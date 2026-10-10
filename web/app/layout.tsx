@@ -6,7 +6,7 @@ import { getViewer } from "@/lib/gate";
 // Font: locally available BMW Type Next with self-hosted Inter fallback, see globals.css.
 // No analytics, no third-party requests. Search engines are told not to index (also robots.ts and next.config headers).
 export const metadata: Metadata = {
-  title: "PMW · Product Manager's Workbench",
+  title: "PMW · Product Minds on Wheels",
   description: "Evidence-backed requirements for the next vehicle generation, with the product manager in control.",
   robots: {
     index: false,
