@@ -3,7 +3,7 @@ name = "pmw-pipeline"
 version = "0.1.0"
 description = "Product Minds on Wheels: data pipeline from BMW customer evidence to scored requirements"
 requires-python = ">=3.11"
-dependencies = ["openpyxl>=3.1", "python-dotenv>=1.0", "pypdf[crypto]>=6.0", "fonttools>=4.0"]
+dependencies = ["openpyxl>=3.1", "python-dotenv>=1.0", "pdfminer.six>=20231228"]
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.84"]

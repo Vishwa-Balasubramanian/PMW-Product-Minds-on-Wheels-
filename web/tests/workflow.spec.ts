@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 
 const testDb = path.resolve('..', 'db', 'pmw-smoke-run.sqlite');
-const db = () => new Database(testDb, { readonly: true, fileMustExist: true });
+const db = () => new DatabaseSync(testDb, { readOnly: true });
 
 test('G70 displays a complete offline requirement ladder', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);

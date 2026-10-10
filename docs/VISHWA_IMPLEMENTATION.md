@@ -1,7 +1,8 @@
 # Vishwa pipeline handoff
 
-The offline workflow turns the eight supplied files into 45 traceable requirement
-drafts, with source-preserving classification, merged themes, deterministic scores
+The offline workflow turns the eight supplied files into 45 core requirement
+drafts plus 86 equipment-backed candidates from Arjun's integrated feature,
+with source-preserving classification, merged themes, deterministic scores
 and challenge explanations. It runs without an API key. Drafts remain proposed;
 root causes are hypotheses and every decision still belongs to the product manager.
 
@@ -14,21 +15,24 @@ uv run pmw build --offline
 uv run pmw verify --report ../docs/reports/vishwa-offline.json
 uv run python -m unittest discover -s tests -v
 cd ../web
-npm ci --ignore-scripts
+npm ci
 npx next typegen
 npx tsc --noEmit
 npm run build
 npm run dev
 ```
 
-Use Node 22 or newer and a current npm. The Windows validation used Node 24 and
-npm 11. Both tested npm versions attempted an unnecessary SQLite native rebuild
-without Visual Studio. `--ignore-scripts` uses the package's shipped native binary;
-its database operations and the app build are verified below. This flag affects
-dependency lifecycle hooks, not explicit `npm run build` commands.
-The pipeline now uses pypdf if Poppler is unavailable; its crypto
-extra reads the supplied encrypted PDFs. Rotated headings and German-only coverage
-are reported in Data health; equipment extraction remains best effort.
+Use Node 24 and a current npm. Windows validation used Node 24 and npm 11.
+The integrated main branch uses `@libsql/client` for local SQLite and hosted Turso,
+and Arjun's positioned `pdfminer.six` parser for equipment. No Poppler installation
+is needed. Equipment extraction remains best effort; six source-backed checks
+protect known option codes, package prices and standard equipment examples.
+
+For browser regression checks, run `npx playwright install chromium` once, then
+`npm run test:e2e` after the production build. On a machine with Edge installed,
+set `PW_CHANNEL=msedge` instead of downloading Chromium. Tests back up the local
+database into `db/pmw-smoke-run.sqlite` using Node's SQLite API. The test server
+explicitly disables remote database settings and never changes hosted PM decisions.
 
 `build` recreates the database, including decisions. Keep a database backup before
 rebuilding a session whose PM decisions matter. Tests use separate databases.
@@ -102,8 +106,9 @@ case is roughly thirty comments, two balanced sources, half-market overlap,
 partial agreement and unknown recency. The report includes alternative thresholds.
 
 Arjun's survey map remains authoritative; theme lookup unions all member mappings.
-His equipment parser now has a Windows PDF fallback. Per-trim package matching and
-new survey mappings remain his lane. Region filtering now also covers the ladder's
+Equipment matching now searches every theme member, retaining the team's equipment
+evidence and quick-win candidates after topic merging. Per-trim package matching
+and new survey mappings remain his lane. Region filtering now also covers the ladder's
 raw customer quote and quoted contradiction examples, including serialized list
 props; global summary findings remain visible as before.
 
@@ -127,3 +132,26 @@ document the shared contract changes for review.
 
 The machine-readable report records all eight input hashes, draft provenance,
 classification counts, quadrant counts and sensitivity scenarios.
+
+## Verified offline results
+
+All existing BMW labels are preserved across 10,128 comments. The rules provisionally label 260
+additional comments (F70: 1, G60: 127, G70: 132), leaving 920 unlabelled. No comment
+is labelled as AI-generated in this offline run.
+
+| Vehicle | Core drafts | Equipment candidates | Core act / validate / monitor / park |
+|---|---:|---:|---|
+| F70 | 15 | 22 | 10 / 5 / 0 / 0 |
+| G60 | 15 | 41 | 9 / 4 / 1 / 1 |
+| G70 | 15 | 23 | 6 / 2 / 3 / 4 |
+
+Including equipment candidates, the G70 split is 8 / 5 / 4 / 21. Every draft has
+a cited hypothesis, customer need, observable successor behaviour and challenge
+narrative. The verification report separates core requirements from candidates so
+the extra equipment findings cannot hide an incomplete core ladder.
+
+Validation passed: 30 Python tests (including the eight real inputs), the pipeline
+build and verification report, TypeScript, production Next.js build, and four
+Playwright tests for the ladder, Challenge/audit, China quote filtering and Data
+health. The production build emits the existing dynamic database-path tracing
+warning from `web/lib/db.ts`; it does not prevent the build or local smoke tests.

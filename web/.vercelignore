@@ -1,0 +1,5 @@
+# Uploaded to Vercel: everything except these.
+node_modules
+.next
+.vercel
+.env*

@@ -2,13 +2,14 @@
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from pmw import ai, challenge, classify, cli, db, derive, evidence, ingest, score, signals, verify
+from pmw import ai, challenge, classify, cli, db, derive, drafts, evidence, ingest, score, signals, verify
 from pmw.themes import member_topics, theme_for
 
 
@@ -153,6 +154,19 @@ class ThemeTests(unittest.TestCase):
         comments['G70-9999'] = {'market':'EU','source':'Source A','severity':None,'text':'a longer minority-market response'}
         self.assertIn('G70-9999', dict(signals.select_evidence(comments, 4)))
 
+    def test_equipment_matches_survive_theme_merging(self):
+        con = connection()
+        self.addCleanup(con.close)
+        con.execute("INSERT INTO feedback VALUES ('G70-0001','G70','Source B','US','US','ICE','Wireless charging not working',NULL,NULL,1)")
+        con.execute("INSERT INTO feedback_labels VALUES ('G70-0001','Defect','Touch screen, operation',NULL,'bmw')")
+        con.execute("INSERT INTO equipment (vehicle,name,availability) VALUES ('G70','Wireless Charging Ablage','standard')")
+        signals.build(con, 'G70')
+        evidence.build_equipment_matches(con, 'G70')
+        match=con.execute('SELECT * FROM equipment_matches').fetchone()
+        self.assertIsNotNone(match)
+        self.assertEqual(match['match_type'], 'standard_but_failing')
+        self.assertEqual(json.loads(match['feedback_ids']), ['G70-0001'])
+
 
 class ScoreTests(unittest.TestCase):
     def test_model_future_lens_cannot_change_scores(self):
@@ -193,6 +207,7 @@ class SuppliedDataTests(unittest.TestCase):
             signals.build(cls.con,vehicle)
             evidence.build_representation(cls.con,vehicle)
             evidence.build_conflicts(cls.con,vehicle)
+            evidence.build_equipment_matches(cls.con,vehicle)
             cli.build_requirements(cls.con,vehicle,15,False,weights)
 
     @classmethod
@@ -225,9 +240,19 @@ class SuppliedDataTests(unittest.TestCase):
         self.assertEqual(len(rows),len(expected))
 
     def test_g70_has_at_least_two_in_each_quadrant(self):
-        values=dict(self.con.execute("SELECT quadrant,COUNT(*) FROM requirements WHERE vehicle='G70' GROUP BY quadrant"))
+        values=dict(self.con.execute("SELECT quadrant,COUNT(*) FROM requirements WHERE vehicle='G70' AND kind='signal' GROUP BY quadrant"))
         self.assertEqual(set(values),{'act','validate','monitor','park'})
         self.assertTrue(all(n>=2 for n in values.values()),values)
+
+    def test_equipment_quick_wins_keep_specific_customer_tasks(self):
+        quick=self.con.execute("SELECT COUNT(*) FROM requirements WHERE kind='quick_win' AND already_exists!='[]'").fetchone()[0]
+        self.assertGreater(quick,0)
+        topics=[r[0] for r in self.con.execute('SELECT s.topic FROM requirements r JOIN signals s ON r.signal_id=s.id')]
+        missing=[t for t in topics if not any(re.search(pattern,t,re.I) for pattern,_ in drafts.PROFILES)]
+        self.assertEqual(missing,[])
+        matches=self.con.execute("SELECT price_eur FROM equipment_matches WHERE vehicle='G60' AND code='7VB'").fetchall()
+        self.assertTrue(matches)
+        self.assertTrue(all(r['price_eur']==2750 for r in matches))
 
 
 if __name__ == '__main__':

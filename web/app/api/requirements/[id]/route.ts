@@ -10,6 +10,6 @@ export async function POST(req: Request, ctx: RouteContext<"/api/requirements/[i
     return Response.json({ ok: false, error: "Unknown action." }, { status: 400 });
   }
   const viewer = await getViewer();
-  const result = applyAction(viewer, id, body);
+  const result = await applyAction(viewer, id, body);
   return Response.json(result, { status: result.ok ? 200 : 400 });
 }

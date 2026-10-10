@@ -13,8 +13,14 @@ from .themes import photo_topic
 
 
 def build_requirements(con, vehicle: str, top: int, use_llm: bool, weights: dict) -> int:
-    sigs = [dict(r) for r in con.execute(
+    top_sigs = [dict(r) for r in con.execute(
         "SELECT * FROM signals WHERE vehicle = ? AND in_scope = 1 AND n_negative > 0 ORDER BY n_negative DESC, topic LIMIT ?", (vehicle, top))]
+    top_ids = {s["id"] for s in top_sigs}
+    quick_ids = {r[0] for r in con.execute(
+        "SELECT DISTINCT signal_or_requirement_id FROM equipment_matches WHERE vehicle = ?", (vehicle,))} - top_ids
+    sigs = top_sigs + [dict(r) for r in con.execute(
+        f"SELECT * FROM signals WHERE id IN ({','.join('?' for _ in quick_ids)}) ORDER BY n_negative DESC, id",
+        tuple(sorted(quick_ids)))] if quick_ids else top_sigs
     if not sigs:
         return 0
     for s in sigs:
@@ -64,11 +70,16 @@ def build_requirements(con, vehicle: str, top: int, use_llm: bool, weights: dict
         conflicts = evidence.conflicts_for(con, vehicle, survey)
         for cf_row in conflicts:
             contradictions.append(f"Markets disagree on '{cf_row['attribute']}': China {cf_row['cn']} vs Europe {cf_row['eu']}.")
-        drafts.append((p, s, d, pf, c, cf, markets, assumptions, uncertainties, contradictions, survey, conflicts))
+        existing = [dict(r) for r in con.execute(
+            "SELECT * FROM equipment_matches WHERE vehicle=? AND signal_or_requirement_id=?", (vehicle, s["id"]))]
+        for m in existing:
+            m["feedback_ids"] = json.loads(m["feedback_ids"])
+        drafts.append((p, s, d, pf, c, cf, markets, assumptions, uncertainties, contradictions, survey, conflicts,
+                       "signal" if s["id"] in top_ids else "quick_win", existing))
 
     drafts.sort(key=lambda x: -x[0])
     th = weights["thresholds"]
-    for i, (p, s, d, pf, c, cf, markets, assumptions, uncertainties, contradictions, survey, conflicts) in enumerate(drafts, 1):
+    for p, s, d, pf, c, cf, markets, assumptions, uncertainties, contradictions, survey, conflicts, kind, existing in drafts:
         rid = 'R-' + s['id'][2:]
         ch = score.challenge_issues(s, survey=survey, representation=rep, conf=c)
         ch['priority_sensitivity'] = score.sensitivity(pf, weights['priority'], th['priority'])
@@ -78,23 +89,24 @@ def build_requirements(con, vehicle: str, top: int, use_llm: bool, weights: dict
         ts = db.now()
         a = aspects.for_topic(vehicle, photo_topic(s["topic"]))
         con.execute(
-            """INSERT INTO requirements (id, vehicle, signal_id, title, customer_voice, signal_text, root_cause, customer_need,
+            """INSERT INTO requirements (id, vehicle, signal_id, kind, already_exists, title, customer_voice, signal_text, root_cause, customer_need,
                requirement, aspect, part, photo, focal_x, focal_y, markets, future_lens, assumptions, uncertainties, contradictions, survey, conflicts, priority,
                priority_factors, confidence, confidence_factors, quadrant, challenge, status, generated_by, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (rid, vehicle, s["id"], d["title"], d.get("customer_voice"),
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (rid, vehicle, s["id"], kind, db.dumps(existing), d["title"], d.get("customer_voice"),
              f"{s['n_negative']} of {s['n_comments']} distinct comments raise concerns about {s['topic']}: "
              f"{s['n_hard_to_use']} hard to use, {s['n_defect']} defects, {s['n_wants']} wishes (categories can overlap).",
              d.get("root_cause"), d.get("customer_need"), d["requirement"],
              a["aspect"], a["part"], a["photo"], a["focal_x"], a["focal_y"], db.dumps(markets), d.get("future_lens"),
              db.dumps(assumptions), db.dumps(uncertainties), db.dumps(contradictions), db.dumps(survey), db.dumps(conflicts),
              p, db.dumps(pf), c, db.dumps(cf), q, db.dumps(ch), "proposed", d["generated_by"], ts, ts))
-        db.audit(con, actor_type="ai", actor="Pipeline", entity_type="requirement", entity_id=rid,
+        db.audit(con, actor_type="system" if d['generated_by'].startswith('evidence-template:') else "ai",
+                 actor="Pipeline", entity_type="requirement", entity_id=rid,
                  action="drafted requirement", after=d["title"], rationale=f"From signal {s['id']} ({s['topic']}), {d['generated_by']}")
-        db.audit(con, actor_type="ai", actor="Scoring engine", entity_type="requirement", entity_id=rid,
+        db.audit(con, actor_type="system", actor="Scoring engine", entity_type="requirement", entity_id=rid,
                  action="scored", after=f"priority {p}, confidence {c}, quadrant {q}",
                  rationale="Deterministic weighted factors, see settings.weights")
-        db.audit(con, actor_type="ai" if narrative_source != 'rule' else "system", actor="Challenge writer",
+        db.audit(con, actor_type="ai" if narrative_result else "system", actor="Challenge writer",
                  entity_type="requirement", entity_id=rid, action="prepared challenge narrative",
                  rationale=(f"{narrative_source}; cache {narrative_result.key}; {narrative_result.error or 'validated'}"
                             if narrative_result else 'Deterministic explanation of the computed issues'))
@@ -116,6 +128,7 @@ def build(args) -> None:
         signals.build(con, code)
         evidence.build_representation(con, code)
         evidence.build_conflicts(con, code)
+        evidence.build_equipment_matches(con, code)
         n = build_requirements(con, code, args.top, args.llm, weights)
         stats[code]["requirements"] = n
     con.commit()

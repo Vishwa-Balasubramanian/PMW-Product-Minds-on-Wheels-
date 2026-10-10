@@ -40,48 +40,60 @@
         "rule": 1
       },
       "unlabelled": 299,
-      "requirements": 15,
-      "quadrants": {
+      "requirements": 37,
+      "core_requirements": 15,
+      "equipment_quick_wins": 22,
+      "core_quadrants": {
         "act": 10,
         "validate": 5,
         "monitor": 0,
         "park": 0
       },
-      "equipment_entries_best_effort": 125,
+      "quadrants": {
+        "act": 11,
+        "validate": 21,
+        "monitor": 0,
+        "park": 5
+      },
+      "equipment_entries_best_effort": 134,
       "draft_sources": [
         "evidence-template:v2"
       ],
-      "borderline_priorities": [],
+      "borderline_priorities": [
+        "R-F70-b4068f9bb6",
+        "R-F70-bd754dd6ed",
+        "R-F70-6f21a1b28a"
+      ],
       "confidence_threshold_scenarios": {
         "55": {
-          "act": 14,
-          "validate": 1,
+          "act": 16,
+          "validate": 16,
           "monitor": 0,
-          "park": 0
+          "park": 5
         },
         "58": {
-          "act": 10,
-          "validate": 5,
+          "act": 11,
+          "validate": 21,
           "monitor": 0,
-          "park": 0
+          "park": 5
         },
         "60": {
-          "act": 8,
-          "validate": 7,
+          "act": 9,
+          "validate": 23,
           "monitor": 0,
-          "park": 0
+          "park": 5
         },
         "62": {
-          "act": 7,
-          "validate": 8,
+          "act": 8,
+          "validate": 24,
           "monitor": 0,
-          "park": 0
+          "park": 5
         },
         "65": {
-          "act": 5,
-          "validate": 10,
+          "act": 6,
+          "validate": 26,
           "monitor": 0,
-          "park": 0
+          "park": 5
         }
       }
     },
@@ -92,50 +104,63 @@
         "rule": 127
       },
       "unlabelled": 313,
-      "requirements": 15,
-      "quadrants": {
+      "requirements": 56,
+      "core_requirements": 15,
+      "equipment_quick_wins": 41,
+      "core_quadrants": {
         "act": 9,
         "validate": 4,
         "monitor": 1,
         "park": 1
       },
-      "equipment_entries_best_effort": 116,
+      "quadrants": {
+        "act": 11,
+        "validate": 8,
+        "monitor": 3,
+        "park": 34
+      },
+      "equipment_entries_best_effort": 206,
       "draft_sources": [
         "evidence-template:v2"
       ],
       "borderline_priorities": [
-        "R-G60-59dd82ef17"
+        "R-G60-59dd82ef17",
+        "R-G60-de7402f550",
+        "R-G60-6922285a35",
+        "R-G60-3652e6b12d",
+        "R-G60-bf9d5d795f",
+        "R-G60-3931e621b2"
       ],
       "confidence_threshold_scenarios": {
         "55": {
-          "act": 9,
-          "validate": 4,
-          "monitor": 1,
-          "park": 1
+          "act": 12,
+          "validate": 7,
+          "monitor": 4,
+          "park": 33
         },
         "58": {
-          "act": 9,
-          "validate": 4,
-          "monitor": 1,
-          "park": 1
+          "act": 11,
+          "validate": 8,
+          "monitor": 3,
+          "park": 34
         },
         "60": {
-          "act": 8,
-          "validate": 5,
-          "monitor": 1,
-          "park": 1
+          "act": 10,
+          "validate": 9,
+          "monitor": 3,
+          "park": 34
         },
         "62": {
-          "act": 8,
-          "validate": 5,
+          "act": 10,
+          "validate": 9,
           "monitor": 1,
-          "park": 1
+          "park": 36
         },
         "65": {
-          "act": 8,
-          "validate": 5,
+          "act": 9,
+          "validate": 10,
           "monitor": 0,
-          "park": 2
+          "park": 37
         }
       }
     },
@@ -146,48 +171,61 @@
         "rule": 132
       },
       "unlabelled": 308,
-      "requirements": 15,
-      "quadrants": {
+      "requirements": 38,
+      "core_requirements": 15,
+      "equipment_quick_wins": 23,
+      "core_quadrants": {
         "act": 6,
         "validate": 2,
         "monitor": 3,
         "park": 4
       },
-      "equipment_entries_best_effort": 153,
+      "quadrants": {
+        "act": 8,
+        "validate": 5,
+        "monitor": 4,
+        "park": 21
+      },
+      "equipment_entries_best_effort": 235,
       "draft_sources": [
         "evidence-template:v2"
       ],
-      "borderline_priorities": [],
+      "borderline_priorities": [
+        "R-G70-36b067e9c2",
+        "R-G70-b938fd921f",
+        "R-G70-f29a12cd8b",
+        "R-G70-f9ca5fdb85"
+      ],
       "confidence_threshold_scenarios": {
         "55": {
-          "act": 6,
-          "validate": 2,
-          "monitor": 4,
-          "park": 3
+          "act": 8,
+          "validate": 5,
+          "monitor": 6,
+          "park": 19
         },
         "58": {
-          "act": 6,
-          "validate": 2,
-          "monitor": 3,
-          "park": 4
+          "act": 8,
+          "validate": 5,
+          "monitor": 4,
+          "park": 21
         },
         "60": {
-          "act": 6,
-          "validate": 2,
-          "monitor": 1,
-          "park": 6
+          "act": 8,
+          "validate": 5,
+          "monitor": 2,
+          "park": 23
         },
         "62": {
-          "act": 6,
-          "validate": 2,
-          "monitor": 1,
-          "park": 6
+          "act": 8,
+          "validate": 5,
+          "monitor": 2,
+          "park": 23
         },
         "65": {
-          "act": 6,
-          "validate": 2,
-          "monitor": 1,
-          "park": 6
+          "act": 7,
+          "validate": 6,
+          "monitor": 2,
+          "park": 23
         }
       }
     }

@@ -15,7 +15,7 @@ const STEPS = [
 
 export default async function Home() {
   const viewer = await getViewer();
-  const vehicles = listVehicles(viewer);
+  const vehicles = await listVehicles(viewer);
   // Deep demo vehicle first in the lane order the sketch uses: 1, 5, 7.
   const lanes = ["F70", "G60", "G70"].map((c) => vehicles.find((v) => v.code === c)!).filter(Boolean);
 

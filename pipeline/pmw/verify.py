@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from . import ai, derive, score
+from . import derive, score
 from .config import RAW, SALES_FILE, STUDY_FILE, VEHICLES
 from .themes import THEME_VERSION
 
@@ -15,9 +15,12 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
     weights = json.loads(con.execute("SELECT value FROM settings WHERE key='weights'").fetchone()[0])
     for code in VEHICLES:
         reqs = [dict(r) for r in con.execute('SELECT * FROM requirements WHERE vehicle=? ORDER BY priority DESC, id', (code,))]
-        if len(reqs) != expected_per_vehicle:
-            errors.append(f'{code}: expected {expected_per_vehicle} requirements, got {len(reqs)}')
+        core = [r for r in reqs if r['kind'] == 'signal']
+        if len(core) != expected_per_vehicle:
+            errors.append(f'{code}: expected {expected_per_vehicle} core requirements, got {len(core)}')
         for r in reqs:
+            if r['kind'] == 'quick_win' and not json.loads(r['already_exists']):
+                errors.append(f"{r['id']}: quick win has no equipment evidence")
             allowed = {row[0] for row in con.execute('SELECT feedback_id FROM signal_evidence WHERE signal_id=?', (r['signal_id'],))}
             draft = {k: json.loads(r[k]) if k in ('assumptions', 'uncertainties') else r[k] for k in derive.FIELDS}
             # Code appends numerical data-health notes after model validation.
@@ -52,7 +55,10 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
         vehicles[code] = {
             'comments': con.execute('SELECT COUNT(*) FROM feedback WHERE vehicle=?', (code,)).fetchone()[0],
             'labelled_comments_by_source': labels, 'unlabelled': unlabelled,
-            'requirements': len(reqs), 'quadrants': quadrants, 'equipment_entries_best_effort': equipment,
+            'requirements': len(reqs), 'core_requirements': len(core),
+            'equipment_quick_wins': len(reqs) - len(core),
+            'core_quadrants': {q: sum(r['quadrant'] == q for r in core) for q in quadrants},
+            'quadrants': quadrants, 'equipment_entries_best_effort': equipment,
             'draft_sources': sorted({r['generated_by'] for r in reqs}),
             'borderline_priorities': [r['id'] for r in reqs if json.loads(r['challenge']).get('priority_sensitivity',{}).get('crosses_threshold')],
             'confidence_threshold_scenarios': {

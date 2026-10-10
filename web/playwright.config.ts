@@ -16,6 +16,7 @@ export default defineConfig({
     command: 'node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3107',
     url: 'http://127.0.0.1:3107',
     reuseExistingServer: false,
-    env: { PMW_DB: path.resolve('..', 'db', 'pmw-smoke-run.sqlite') },
+    env: { PMW_DB: path.resolve('..', 'db', 'pmw-smoke-run.sqlite'),
+      VERCEL: '', PMW_USE_REMOTE: '0', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '' },
   },
 });

@@ -5,12 +5,13 @@ Owner: Arjun (data and evidence). Equipment parsing is best-effort and the obvio
 from __future__ import annotations
 
 import re
-import logging
 import shutil
 import subprocess
 from collections import defaultdict
 
 import openpyxl
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTContainer, LTTextLine
 
 from . import db
 from .config import (POWERTRAIN, RAW, SALES_FILE, STUDY_FILE, VEHICLES, country_to_market)
@@ -220,32 +221,19 @@ PRICE_RE = re.compile(r"^(?P<name>\S.*?)\s{2,}(?P<code>[0-9][0-9A-Z]{2}|[A-Z0-9]
 PKG_RE = re.compile(r"^(?P<name>[A-ZÄÖÜ][A-ZÄÖÜ &\-]+PAKET[A-ZÄÖÜ ]*)\s{2,}(?P<code>[0-9A-Z]{3})\s+(?P<price>[\d.]+,[–-])")
 
 
-def ingest_equipment(con, code: str) -> None:
-    """Best-effort parse of the German price list. Next step: proper package contents and per-trim columns."""
+def _ingest_equipment_legacy(con, code: str) -> None:
+    """Parse the German equipment list using Poppler or the bundled Python fallback."""
     pdf = RAW / VEHICLES[code]["options_file"]
     if shutil.which("pdftotext"):
-        text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True,
-                              text=True, encoding="utf-8", check=True).stdout
+        text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True).stdout
     else:
-        # Cross-platform fallback: Windows builds also consume all supplied PDFs.
-        from pypdf import PdfReader
-        logger = logging.getLogger('pypdf._text_extraction._layout_mode._fixed_width_page')
-        rotated = []
-        def collect_rotation_warning(record):
-            if record.getMessage().startswith('Rotated text discovered'):
-                rotated.append(record.getMessage())
-                return False
-            return True
-        logger.addFilter(collect_rotation_warning)
-        reader = PdfReader(pdf)
         try:
-            text = '\n'.join(p.extract_text(extraction_mode='layout') or '' for p in reader.pages)
-        finally:
-            reader.close()
-            logger.removeFilter(collect_rotation_warning)
-        if rotated:
-            db.issue(con, 'equipment', 'warning', 'PDF tables contain rotated headings that layout extraction may omit.',
-                     'Equipment entries are provisional; verify per-trim availability against the source PDF.', code)
+            from pdfminer.high_level import extract_text
+            text = extract_text(str(pdf), laparams=None)
+        except ImportError:
+            db.issue(con, "equipment", "warning", "Neither pdftotext nor pdfminer is available; equipment list skipped.",
+                     "Install pipeline dependencies (uv sync) or Poppler and rebuild.", code)
+            return
     package = None
     n = 0
     for line in text.splitlines():
@@ -287,6 +275,99 @@ def ingest_equipment(con, code: str) -> None:
              action="parsed equipment list", after=f"{n} entries (best-effort parser)")
 
 
+def _walk_pdf_lines(node):
+    if isinstance(node, LTTextLine):
+        yield node
+    elif isinstance(node, LTContainer):
+        for child in node:
+            yield from _walk_pdf_lines(child)
+
+
+def _equipment_page_rows(page):
+    lines = sorted(_walk_pdf_lines(page), key=lambda line: (-line.y0, line.x0))
+    clusters: list[list] = []
+    for line in lines:
+        if clusters and abs(clusters[-1][0].y0 - line.y0) <= 1.8:
+            clusters[-1].append(line)
+        else:
+            clusters.append([line])
+    for cluster in clusters:
+        parts = [(line.x0, line.get_text().strip()) for line in cluster if line.get_text().strip()]
+        if parts:
+            yield parts
+
+
+def _price_eur(text: str) -> float | None:
+    m = re.search(r"([\d.]+),\s*(?:–|-|—)", text)
+    return float(m.group(1).replace(".", "")) if m else None
+
+
+def ingest_equipment(con, code: str) -> None:
+    """Read SA codes, euro prices and the per-trim availability marks from positioned PDF text."""
+    pdf = RAW / VEHICLES[code]["options_file"]
+    n = 0
+    for page_no, page in enumerate(extract_pages(str(pdf))):
+        package = None
+        for parts in _equipment_page_rows(page):
+            name_parts = [s for x, s in parts if x < 200 and not re.fullmatch(r"[■□▪▫]+", s)]
+            name = next((s for s in name_parts if re.search(r"[A-Za-zÄÖÜäöüß]{3}", s)), None)
+            codes = [(x, s) for x, s in parts if 200 <= x < 390 and re.fullmatch(r"[0-9A-Z]{3}", s)]
+            marks = [(int(round(x)), s) for x, s in parts if s in ("■", "□") and 300 <= x < 540]
+            price = next((_price_eur(s) for x, s in parts if x >= 260 and _price_eur(s) is not None), None)
+            raw = " | ".join(s for _, s in parts)
+            trim = ",".join(f"col_{x}" for x, _ in marks) or None
+            if codes and name:
+                option_code = codes[0][1]
+                is_package = "paket" in name.casefold()
+                package = name.title() if is_package else None
+                availability = "optional" if any(mark == "□" for _, mark in marks) or price is not None else "unknown"
+                con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,trim,raw) VALUES (?,?,?,?,?,?,?,?)",
+                            (code, name, option_code, price, availability, None, trim, f"page {page_no + 1}: {raw}"))
+                n += 1
+                continue
+            if not name:
+                continue
+            if package:
+                availability, parent = "package_item", package
+            elif any(mark == "■" for _, mark in marks):
+                availability, parent = "standard", None
+            elif any(mark == "□" for _, mark in marks):
+                availability, parent = "optional", None
+            else:
+                continue
+            con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,trim,raw) VALUES (?,?,?,?,?,?,?,?)",
+                        (code, name, None, price, availability, parent, trim, f"page {page_no + 1}: {raw}"))
+            n += 1
+            if availability == "standard":
+                package = None
+    db.issue(con, "equipment", "warning",
+             "Price lists cover Germany only (July 2026). No US or China equipment data was provided.",
+             "Equipment gaps for other markets are marked as an assumption.", code)
+    db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id=f"{code} price list",
+             action="parsed equipment list", after=f"{n} entries (positioned PDF parser)")
+
+
+def validate_equipment_facts(con) -> None:
+    """Guard the hand-verified PDF examples that the equipment finder depends on."""
+    checks = {
+        "G60 Comfort Paket 7VB at €2,750": """SELECT 1 FROM equipment WHERE vehicle='G60' AND code='7VB' AND price_eur=2750""",
+        "G60 7VB contains front seat ventilation": """SELECT 1 FROM equipment e JOIN equipment p ON p.vehicle=e.vehicle
+            WHERE e.vehicle='G60' AND e.package='Comfort Paket' AND lower(e.name) LIKE '%sitzbelüftung%'
+            AND p.code='7VB' AND p.price_eur=2750""",
+        "G60 comfort seats 456 at €930": """SELECT 1 FROM equipment WHERE vehicle='G60' AND code='456' AND price_eur=930""",
+        "G60 multifunction seats 4MA at €1,750": """SELECT 1 FROM equipment WHERE vehicle='G60' AND code='4MA' AND price_eur=1750""",
+        "G70 multifunction seats standard": """SELECT 1 FROM equipment WHERE vehicle='G70' AND availability='standard'
+            AND lower(name) LIKE '%multifunktionssitze%'""",
+        "G70 comfort access standard": """SELECT 1 FROM equipment WHERE vehicle='G70' AND availability='standard'
+            AND lower(name)='komfortzugang'""",
+    }
+    missing = [label for label, sql in checks.items() if not con.execute(sql).fetchone()]
+    if missing:
+        raise RuntimeError("Equipment parser failed source checks: " + "; ".join(missing))
+    db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id="equipment",
+             action="verified equipment examples", after="6 price-list checks passed")
+
+
 def run(con) -> dict:
     ingest_vehicles(con)
     stats = {code: ingest_feedback(con, code) for code in VEHICLES}
@@ -294,5 +375,6 @@ def run(con) -> dict:
     ingest_sales(con)
     for code in VEHICLES:
         ingest_equipment(con, code)
+    validate_equipment_facts(con)
     con.commit()
     return stats

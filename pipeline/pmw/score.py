@@ -8,12 +8,13 @@ from __future__ import annotations
 import math
 
 DEFAULT_WEIGHTS = {
-    # Customer pain + repeat evidence account for 60%; market reach contributes 20%.
+    # Customer pain carries 35% and repeat evidence 25%; market reach contributes 20%.
     # Competitor name-drops are weak evidence (5%). Future relevance is a stated
     # strategy assumption (15%), never inferred market demand or projected revenue.
     "priority": {"impact": 0.35, "frequency": 0.25, "market": 0.20, "competitive": 0.05, "future": 0.15},
-    # Breadth and independent perspectives matter as much as sample quantity.
-    # Unknown dates receive neutral recency, never fabricated freshness.
+    # Quantity and source diversity each carry 25%, balancing sample size with breadth.
+    # Representation and cross-evidence agreement each carry 20%; neither alone proves
+    # sufficiency. Recency gets 10% because dates are often absent; unknown is neutral.
     "confidence": {"quantity": 0.25, "sources": 0.25, "representation": 0.20, "agreement": 0.20, "recency": 0.10},
     # 55 retains the UI's Should-have boundary. 58 approximates a reference case:
     # 30 comments, two balanced sources, half-market coverage, partial agreement,
@@ -31,7 +32,6 @@ FACTOR_LABELS = {
 # Topics likely to matter more by 2030. Marked as an assumption wherever used.
 FUTURE_TOPICS = ("eSIM", "Connected", "App", "CarPlay", "charging", "Range", "assistant", "Assistant",
                  "Operating", "Touch screen", "Navigation", "Highway", "Driver assistance", "Remote")
-FUTURE_LENS_SCORE = {"current_pain": 0.45, "emerging": 0.7, "future_must_have": 0.9}
 
 
 def _weighted(factors: dict, weights: dict) -> int:

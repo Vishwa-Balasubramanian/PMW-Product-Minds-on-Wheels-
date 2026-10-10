@@ -34,6 +34,8 @@ export type Requirement = {
   id: string;
   vehicle: string;
   signal_id: string;
+  kind: "signal" | "quick_win" | "market_conflict";
+  already_exists: EquipmentMatch[];
   title: string;
   customer_voice: string | null;
   signal_text: string | null;
@@ -63,6 +65,18 @@ export type Requirement = {
   generated_by: string;
   created_at: string;
   updated_at: string;
+};
+
+export type EquipmentMatch = {
+  vehicle: string;
+  signal_or_requirement_id: string;
+  match_type: "option_same_vehicle" | "package_same_vehicle" | "standard_other_vehicle" | "standard_but_failing";
+  equipment_name: string;
+  code: string | null;
+  price_eur: number | null;
+  source_vehicle: string | null;
+  feedback_ids: string[];
+  note: string;
 };
 
 export type Quote = {

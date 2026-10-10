@@ -24,3 +24,8 @@ web/next-env.d.ts
 *.tsbuildinfo
 
 .DS_Store
+
+# Agent tooling added by CLI integrations (local only)
+web/.agents/
+web/.claude/
+web/skills-lock.json

@@ -9,20 +9,20 @@ Customer voice → Signal → Root cause → Customer need → Requirement → P
 
 ## Run it (10 minutes)
 
-Needs: Node 22+, current npm, and [uv](https://docs.astral.sh/uv/). Poppler is optional;
-the pipeline includes a PDF reader fallback for Windows and other environments.
+Needs: Node 24, current npm, and [uv](https://docs.astral.sh/uv/). The pipeline reads
+the supplied PDFs directly with Python, including on Windows.
 
 ```bash
-# 2. Build the database (about 2 seconds)
+# 1. Build the database (about 10 seconds)
 cd pipeline
 uv sync
 uv run pmw build --offline  # complete evidence drafts; no network generation
 uv run pmw verify          # citations, counts and deterministic scoring checks
 # uv sync --extra llm && ANTHROPIC_API_KEY=... uv run pmw build --llm   # AI mode, see below
 
-# 3. Run the web app
+# 2. Run the web app
 cd ../web
-npm ci --ignore-scripts     # uses the shipped SQLite binary without a local C++ build
+npm ci
 npm run dev                 # http://localhost:3000
 ```
 
@@ -32,6 +32,18 @@ After pulling changes to `pipeline/pmw/db.py`, rebuild: the build drops and recr
 **Priority display:** the list is grouped MoSCoW-style by priority score: Must have 65+, Should have 55+, Could have 45+,
 Won't have this time below 45 (`MOSCOW` in `web/components/ui.tsx`). The Act / Validate first / Monitor / Park chip is the
 separate decision quadrant (priority × confidence).
+
+## Hosted demo
+
+Live at **https://product-minds-on-wheels.vercel.app** (Vercel project `product-minds-on-wheels`).
+
+- Online, the app reads and writes a hosted Turso database (SQLite in the cloud, free plan, added through the
+  Vercel Marketplace). Locally it uses `db/pmw.sqlite`. Same code, chosen in `web/lib/db.ts`.
+- Update the hosted data after a pipeline change: `cd web && vercel env pull .env.local && npm run db:push`.
+  This replaces everything online, including PM decisions made on the hosted demo.
+- Deploy code: `cd web && vercel deploy --prod`. The project is not connected to GitHub, so pushes do not deploy.
+- Search engines are kept out three ways (robots meta tag, `robots.txt`, `X-Robots-Tag` header). No analytics,
+  and the font is self-hosted, so visitors' browsers make no requests to third parties.
 
 ## How it fits together
 

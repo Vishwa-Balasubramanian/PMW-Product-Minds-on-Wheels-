@@ -73,7 +73,21 @@ CREATE TABLE IF NOT EXISTS equipment (
   price_eur REAL,
   availability TEXT NOT NULL,      -- standard | optional | package_item | unknown
   package TEXT,                    -- package name when availability = package_item
+  trim TEXT,
   raw TEXT
+);
+
+-- Customer wishes or complaints checked against price-list equipment.
+CREATE TABLE IF NOT EXISTS equipment_matches (
+  vehicle TEXT NOT NULL,
+  signal_or_requirement_id TEXT NOT NULL,
+  match_type TEXT NOT NULL,         -- option_same_vehicle | package_same_vehicle | standard_other_vehicle | standard_but_failing
+  equipment_name TEXT NOT NULL,
+  code TEXT,
+  price_eur REAL,
+  source_vehicle TEXT,
+  feedback_ids TEXT NOT NULL,       -- JSON array of source comment IDs
+  note TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS data_issues (
@@ -134,6 +148,8 @@ CREATE TABLE IF NOT EXISTS requirements (
   id TEXT PRIMARY KEY,             -- R-G70-001
   vehicle TEXT NOT NULL,
   signal_id TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'signal', -- signal | quick_win | market_conflict
+  already_exists TEXT NOT NULL DEFAULT '[]', -- JSON equipment match rows
   title TEXT NOT NULL,
   customer_voice TEXT,             -- the ladder: voice -> signal -> root cause -> need -> requirement
   signal_text TEXT,
@@ -189,7 +205,7 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 PIPELINE_TABLES = [
-    "vehicles", "feedback", "feedback_labels", "survey_scores", "sales", "equipment",
+    "vehicles", "feedback", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
     "data_issues", "representation", "market_conflicts", "signals", "signal_evidence",
     "requirements", "audit_events", "settings",
 ]

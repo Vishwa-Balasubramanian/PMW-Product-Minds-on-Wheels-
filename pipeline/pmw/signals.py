@@ -15,7 +15,6 @@ from .themes import THEME_VERSION, theme_for
 
 NEGATIVE = {"Difficult to Use", "Defect", "Wants"}
 SEVERITY_SCORE = {"very minor": 0.2, "minor": 0.4, "moderate": 0.6, "serious": 0.8, "very serious": 1.0}
-SOURCE_RANK = {"Source C": 0, "Source B": 1, "Source A": 2, "Source D": 3}
 
 
 def select_evidence(comments: dict, limit: int) -> list[tuple]:
@@ -66,7 +65,7 @@ def classify_unlabelled(con, vehicle: str, use_llm: bool = False) -> int:
             for label in entry["labels"]:
                 con.execute("INSERT INTO feedback_labels (feedback_id,feedback_type,topic,subtopic,label_source) "
                             "VALUES (?,?,?,?,?)", (entry["id"], label["feedback_type"], label["topic"], None, source))
-        db.audit(con, actor_type="ai" if source == "ai" else "system", actor="Feedback classifier",
+        db.audit(con, actor_type="ai" if result else "system", actor="Feedback classifier",
                  entity_type="dataset", entity_id=vehicle, action="classified feedback batch",
                  after=db.dumps({"reviewed": len(chunk), "labelled": labelled, "abstained": len(chunk)-labelled,
                                  "source": source, "ids": [c["id"] for c in chunk]}),
@@ -123,7 +122,7 @@ def build(con, vehicle: str) -> list[str]:
 
     stats.sort(key=lambda s: (-len(s["neg"]), s["topic"]))
     ids = []
-    for i, s in enumerate(stats, 1):
+    for s in stats:
         # Stable identity survives changing counts/rank when new comments arrive.
         sid = f"S-{vehicle}-" + hashlib.sha256(s["topic"].encode()).hexdigest()[:10]
         ok, why = topic_scope(s["topic"])
@@ -139,9 +138,9 @@ def build(con, vehicle: str) -> list[str]:
         for fid, _ in select_evidence(s['likes'], 10):
             con.execute("INSERT INTO signal_evidence (signal_id, feedback_id, role) VALUES (?,?,?)", (sid, fid, "contradicts"))
         if not ok:
-            db.audit(con, actor_type="ai", actor="Scope guard", entity_type="signal", entity_id=sid,
+            db.audit(con, actor_type="system", actor="Scope guard", entity_type="signal", entity_id=sid,
                      action="excluded signal from requirements", rationale=why)
         ids.append(sid)
-    db.audit(con, actor_type="ai", actor="Pipeline", entity_type="dataset", entity_id=vehicle,
+    db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id=vehicle,
              action="detected signals", after=f"{len(ids)} themes with customer comments; map {THEME_VERSION}")
     return ids
