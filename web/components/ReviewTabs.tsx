@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 const TABS = ["Overview", "Evidence", "Scoring", "Activity"] as const;
 
@@ -9,9 +9,27 @@ export function ReviewTabs({ overview, evidence, scoring, activity }: Record<Low
   const [active, setActive] = useState(0);
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const pendingQuote = useRef<string | null>(null);
   const panels = [overview, evidence, scoring, activity];
+  useEffect(() => {
+    if (active !== 1 || !pendingQuote.current) return;
+    const quote = document.getElementById(pendingQuote.current);
+    if (quote) {
+      window.location.hash = quote.id;
+      quote.scrollIntoView({ block: "center" });
+      quote.focus({ preventScroll: true });
+    }
+    pendingQuote.current = null;
+  }, [active]);
   return (
-    <div className="review-tabs">
+    <div className="review-tabs" onClick={(event) => {
+      const link = (event.target as Element).closest<HTMLAnchorElement>('a[href^="#comment-"]');
+      if (!link || active === 1 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      // A price-list match in Overview can link to a quote in the hidden Evidence tab.
+      event.preventDefault();
+      pendingQuote.current = link.hash.slice(1);
+      setActive(1);
+    }}>
       <div role="tablist" aria-label="Requirement details" className="review-tablist">
         {TABS.map((tab, index) => (
           <button key={tab} ref={(el) => { buttons.current[index] = el; }} id={`${id}-tab-${index}`} role="tab" aria-selected={active === index} aria-controls={`${id}-panel-${index}`} tabIndex={active === index ? 0 : -1}

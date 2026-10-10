@@ -5,6 +5,7 @@ import type { InStatement } from "@libsql/client";
 import { cookies } from "next/headers";
 import { all, nowIso, one, parse, writeBatch } from "./db";
 import { DEFAULT_REGION, MARKET_LABEL, MARKETS, REGIONS, REGION_COOKIE, isRegion, marketsFor, type Market, type RegionCode } from "./regions";
+import { PRIORITY_FACTORS, factorValues, quadrantOf, sensitivity, weightedScore, type PriorityWeights, type Thresholds } from "./score";
 import type { AuditEvent, Quote, Requirement, Signal, Weights } from "./types";
 
 export type Viewer = { region: RegionCode; markets: Market[]; label: string; actor: string };
@@ -107,10 +108,46 @@ function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
     contradictions: r.contradictions.map((text) => text.split(" For example ")[0]) };
 }
 
+/**
+ * Equipment matches ("you already sell this") cite supporting comment IDs. Keep only the IDs from markets the viewer
+ * may see and record how many were removed, so restricted IDs never reach page or client component props.
+ * An ID that is not found in `feedback` counts as hidden.
+ */
+async function restrictMatchIds(viewer: Viewer, reqs: Requirement[]): Promise<Requirement[]> {
+  if (viewer.region === "ALL") return reqs;
+  const ids = [...new Set(reqs.flatMap((r) => r.already_exists.flatMap((m) => m.feedback_ids)))];
+  if (!ids.length) return reqs;
+  const rows = await all<{ id: string; market: string }>(`SELECT id, market FROM feedback WHERE id IN ${inList(ids)}`, ids);
+  const marketOf = new Map(rows.map((r) => [r.id, r.market]));
+  const visible = (id: string) => viewer.markets.includes(marketOf.get(id) as Market);
+  return reqs.map((r) => r.already_exists.length === 0 ? r : {
+    ...r,
+    already_exists: r.already_exists.map((m) => {
+      const keep = m.feedback_ids.filter(visible);
+      return { ...m, feedback_ids: keep, hidden_count: m.feedback_ids.length - keep.length };
+    }),
+  });
+}
+
 export async function listRequirements(viewer: Viewer, vehicle: string): Promise<Requirement[]> {
-  const rows = await all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
-  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
-    .map((r) => restrictRawEvidence(viewer, r));
+  const [rows, ranking] = await Promise.all([
+    all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]),
+    activeRanking(),
+  ]);
+  const list = await restrictMatchIds(
+    viewer,
+    rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
+      .map((r) => restrictRawEvidence(viewer, r)),
+  );
+  if (!ranking) return list;
+  // Stable sort: ties keep the stored (default-weight) order. The weights preview reproduces this rule client-side.
+  return list.map((r) => rescore(r, ranking)).sort((a, b) => b.priority - a.priority);
+}
+
+/** Requirement IDs in the stored (default-weight) order, the tie-break for any re-ranking. IDs only. */
+export async function storedOrder(vehicle: string): Promise<string[]> {
+  const rows = await all<{ id: string }>("SELECT id FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
+  return rows.map((r) => r.id);
 }
 
 export async function getRequirementRow(id: string): Promise<Requirement | undefined> {
@@ -144,7 +181,8 @@ export async function getRequirement(viewer: Viewer, id: string): Promise<Requir
   const hidden: Record<string, number> = {};
   for (const q of allQuotes) if (!viewer.markets.includes(q.market as Market)) hidden[q.market] = (hidden[q.market] ?? 0) + 1;
   await logAccess(viewer, id, Object.keys(hidden).length > 0);
-  const requirement = restrictRawEvidence(viewer, req);
+  const ranking = await activeRanking();
+  const [requirement] = await restrictMatchIds(viewer, [restrictRawEvidence(viewer, ranking ? rescore(req, ranking) : req)]);
   if (viewer.region !== "ALL") {
     const voice = quotes.find((q) => q.role === "supports");
     requirement.customer_voice = voice ? `“${voice.text.slice(0, 260)}” (${voice.id})` : null;
@@ -248,19 +286,49 @@ export function auditStatement(e: NewAuditEvent): InStatement {
   };
 }
 
-export async function auditFor(entityId: string): Promise<AuditEvent[]> {
-  return all<AuditEvent>("SELECT * FROM audit_events WHERE entity_id = ? ORDER BY id DESC", [entityId]);
+const COMMENT_ID = /\b[A-Z][0-9]{2}-\d{4}\b/g;
+
+/**
+ * Audit text can name comment IDs (e.g. "3 wishing customer comments: G60-0532, …"). IDs from markets outside the
+ * viewer's region are replaced, so the trail follows the same rule as the evidence, the banner and the export.
+ */
+async function redactAuditIds(viewer: Viewer, events: AuditEvent[]): Promise<AuditEvent[]> {
+  if (viewer.region === "ALL") return events;
+  const fields = ["action", "before", "after", "rationale"] as const;
+  const ids = new Set<string>();
+  for (const e of events) for (const f of fields) for (const m of (e[f] ?? "").matchAll(COMMENT_ID)) ids.add(m[0]);
+  if (!ids.size) return events;
+  const list = [...ids];
+  const rows = await all<{ id: string; market: string }>(`SELECT id, market FROM feedback WHERE id IN ${inList(list)}`, list);
+  const marketOf = new Map(rows.map((r) => [r.id, r.market]));
+  const hidden = (id: string) => {
+    const m = marketOf.get(id);
+    return m ? !viewer.markets.includes(m as Market) : false; // not a known comment ID: leave as is
+  };
+  return events.map((e) => {
+    const out = { ...e };
+    for (const f of fields) {
+      const v = out[f];
+      if (v) out[f] = v.replace(COMMENT_ID, (id) => (hidden(id) ? `[comment from ${MARKET_LABEL[marketOf.get(id)!] ?? "another market"}]` : id));
+    }
+    return out;
+  });
 }
 
-export async function auditLog(opts: { vehicle?: string; limit?: number } = {}): Promise<AuditEvent[]> {
+export async function auditFor(viewer: Viewer, entityId: string): Promise<AuditEvent[]> {
+  const events = await all<AuditEvent>("SELECT * FROM audit_events WHERE entity_id = ? ORDER BY id DESC", [entityId]);
+  return redactAuditIds(viewer, events);
+}
+
+export async function auditLog(viewer: Viewer, opts: { vehicle?: string; limit?: number } = {}): Promise<AuditEvent[]> {
   const lim = opts.limit ?? 400;
-  if (opts.vehicle) {
-    return all<AuditEvent>(
-      "SELECT * FROM audit_events WHERE entity_id LIKE ? OR entity_id = ? OR entity_id LIKE ? ORDER BY id DESC LIMIT ?",
-      [`R-${opts.vehicle}-%`, opts.vehicle, `S-${opts.vehicle}-%`, lim],
-    );
-  }
-  return all<AuditEvent>("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", [lim]);
+  const events = opts.vehicle
+    ? await all<AuditEvent>(
+        "SELECT * FROM audit_events WHERE entity_id LIKE ? OR entity_id = ? OR entity_id LIKE ? ORDER BY id DESC LIMIT ?",
+        [`R-${opts.vehicle}-%`, opts.vehicle, `S-${opts.vehicle}-%`, lim],
+      )
+    : await all<AuditEvent>("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", [lim]);
+  return redactAuditIds(viewer, events);
 }
 
 // ---------- vehicle-level evidence ----------
@@ -268,6 +336,49 @@ export async function auditLog(opts: { vehicle?: string; limit?: number } = {}):
 export async function getWeights(): Promise<Weights> {
   const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'weights'");
   return parse(r?.value, { priority: {}, confidence: {}, thresholds: { priority: 55, confidence: 62 } });
+}
+
+// ---------- active priority weights ----------
+// The pipeline stores priority and quadrant under the default weights (settings.weights). A product manager can
+// set strategy weights for the whole team (settings.weights_active, written by setWeights in actions.ts). While they
+// exist, every read below recomputes priority and quadrant from the stored factor values; the stored columns stay
+// untouched, so Reset restores the original numbers exactly. Confidence is never recomputed: it measures evidence.
+
+export type ActiveWeights = {
+  priority: PriorityWeights;
+  preset: string; // a key from PRESETS in score.ts, or "custom"
+  changed_by: string;
+  region: string;
+  changed_at: string;
+};
+
+export async function getActiveWeights(): Promise<ActiveWeights | null> {
+  const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'weights_active'");
+  const a = parse<ActiveWeights | null>(r?.value, null);
+  if (!a || typeof a !== "object" || !a.priority) return null;
+  const ok = PRIORITY_FACTORS.every((k) => typeof a.priority[k] === "number" && a.priority[k] >= 0)
+    && PRIORITY_FACTORS.some((k) => a.priority[k] > 0);
+  return ok ? a : null;
+}
+
+type Ranking = { weights: PriorityWeights; thresholds: Thresholds };
+
+async function activeRanking(): Promise<Ranking | null> {
+  const [active, w] = await Promise.all([getActiveWeights(), getWeights()]);
+  return active ? { weights: active.priority, thresholds: w.thresholds } : null;
+}
+
+/** Priority, quadrant, factor weights and priority sensitivity under the active weights. */
+function rescore(r: Requirement, { weights, thresholds }: Ranking): Requirement {
+  const values = factorValues(r.priority_factors);
+  const priority = weightedScore(values, weights);
+  const priority_factors = Object.fromEntries(
+    Object.entries(r.priority_factors).map(([k, f]) => [k, { ...f, weight: weights[k as keyof PriorityWeights] ?? f.weight }]),
+  );
+  const challenge = r.challenge.priority_sensitivity
+    ? { ...r.challenge, priority_sensitivity: sensitivity(values, weights, thresholds.priority) }
+    : r.challenge;
+  return { ...r, priority, priority_factors, challenge, quadrant: quadrantOf(priority, r.confidence, thresholds) };
 }
 
 export async function getFactorLabels(): Promise<Record<string, string>> {
@@ -329,4 +440,63 @@ export async function vehicleTotals(vehicle: string) {
     n("SELECT COUNT(*) n FROM signals WHERE vehicle = ? AND in_scope = 0", [vehicle]),
   ]);
   return { comments, unlabelled, signals, outOfScope };
+}
+
+// ---------- workflow ----------
+
+export type WorkflowStats = {
+  comments: number;
+  surveyRows: number;
+  equipmentRows: number;
+  dataIssues: number;
+  labelledByRules: number;
+  signals: number;
+  outOfScope: number;
+  conflicts: number;
+  equipmentMatches: number;
+  requirements: number;
+  quickWins: number;
+  drafts: Record<string, number>; // generated_by -> count
+  quadrants: Record<string, number>;
+  decided: number;
+  awaiting: number;
+  auditEvents: number;
+  pmEvents: number;
+};
+
+/** Live totals for the workflow page. Aggregates only, no customer text, so the same for every region. */
+export async function workflowStats(): Promise<WorkflowStats> {
+  const [comments, surveyRows, equipmentRows, dataIssues, labelledByRules, signals, outOfScope, conflicts, equipmentMatches,
+    requirements, quickWins, decided, awaiting, auditEvents, pmEvents] = await Promise.all([
+    n("SELECT COUNT(*) n FROM feedback", []),
+    n("SELECT COUNT(*) n FROM survey_scores", []),
+    n("SELECT COUNT(*) n FROM equipment", []),
+    n("SELECT COUNT(*) n FROM data_issues", []),
+    n("SELECT COUNT(DISTINCT feedback_id) n FROM feedback_labels WHERE label_source <> 'bmw'", []),
+    n("SELECT COUNT(*) n FROM signals", []),
+    n("SELECT COUNT(*) n FROM signals WHERE in_scope = 0", []),
+    n("SELECT COUNT(*) n FROM market_conflicts WHERE in_scope = 1", []),
+    n("SELECT COUNT(*) n FROM equipment_matches", []),
+    n("SELECT COUNT(*) n FROM requirements", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE kind = 'quick_win'", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE status IN ('approved','rejected','validate')", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE status IN ('proposed','edited')", []),
+    n("SELECT COUNT(*) n FROM audit_events", []),
+    n("SELECT COUNT(*) n FROM audit_events WHERE actor_type = 'pm'", []),
+  ]);
+  const drafts = Object.fromEntries(
+    (await all<{ g: string; n: number }>("SELECT generated_by g, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.g, Number(r.n)]),
+  );
+  const ranking = await activeRanking();
+  const quadrants: Record<string, number> = ranking
+    ? (await all<{ priority_factors: string; confidence: number }>("SELECT priority_factors, confidence FROM requirements")).reduce((acc, r) => {
+      const q = quadrantOf(weightedScore(factorValues(parse(r.priority_factors, {})), ranking.weights), Number(r.confidence), ranking.thresholds);
+      acc[q] = (acc[q] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+    : Object.fromEntries(
+      (await all<{ q: string; n: number }>("SELECT quadrant q, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.q, Number(r.n)]),
+    );
+  return { comments, surveyRows, equipmentRows, dataIssues, labelledByRules, signals, outOfScope, conflicts, equipmentMatches,
+    requirements, quickWins, drafts, quadrants, decided, awaiting, auditEvents, pmEvents };
 }

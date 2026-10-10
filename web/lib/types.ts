@@ -78,6 +78,8 @@ export type EquipmentMatch = {
   source_vehicle: string | null;
   feedback_ids: string[];
   note: string;
+  /** Not stored. Set by gate.ts: how many of feedback_ids were removed because they come from markets the viewer may not see. */
+  hidden_count?: number;
 };
 
 export type Quote = {

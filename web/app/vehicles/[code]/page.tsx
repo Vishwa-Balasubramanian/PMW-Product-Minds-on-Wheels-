@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
-import { MOSCOW, Matrix, QuadrantBadge, Section, StatusBadge } from "@/components/ui";
+import { WeightsPanel } from "@/components/WeightsPanel";
+import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
-  auditFor, dataIssues, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
-  marketConflicts, missingVoices, representation, vehicleTotals,
+  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
+  marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
 } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
+import { PRIORITY_FACTORS, factorValues, presetLabel, type PriorityWeights } from "@/lib/score";
 import { QUADRANT, type Quadrant } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,12 +29,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   if (!vehicle) notFound();
   const viewer = await getViewer();
   const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
-  const qFilter = typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
+  const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
-  const [all, weights, voices, totals, labels] = await Promise.all([
-    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(),
+  const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
+    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(), storedOrder(code),
   ]);
-  const reqs = qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const quickWins = all.filter((r) => r.kind === "quick_win");
+  const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
@@ -65,6 +68,17 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         {VIEWS.map((v) => <Link key={v.k} href={`/vehicles/${code}?view=${v.k}`} aria-current={view === v.k ? "page" : undefined}>{v.label}</Link>)}
       </nav>
       <div className={`vehicle-body ${view === "inbox" ? "is-inbox" : ""}`}>
+        {view === "inbox" && (
+          <div className="workspace-weights">
+            <WeightsPanel
+              items={[...all].sort((a, b) => stored.indexOf(a.id) - stored.indexOf(b.id))
+                .map((r) => ({ id: r.id, title: r.title, values: factorValues(r.priority_factors) }))}
+              labels={Object.fromEntries(PRIORITY_FACTORS.map((k) => [k, labels[k] ?? k]))}
+              defaults={weights.priority as PriorityWeights}
+              active={active ? { priority: active.priority, preset: active.preset } : null}
+            />
+          </div>
+        )}
         {view === "inbox" && <Inbox />}
         {view === "matrix" && (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,640px)_1fr]">
@@ -93,12 +107,12 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
 
   async function Inbox() {
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
-    const events = detail ? await auditFor(detail.requirement.id) : [];
+    const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
       <div className={`requirements-layout ${typeof sp.req === "string" && selectedId ? "has-selection" : ""}`}>
         <aside className="requirements-list" aria-label="Requirements">
           <div className="list-toolbar">
-            <div className="filter-chips" aria-label="Filter by quadrant">
+            <div className="filter-chips" role="group" aria-label="Filter requirements">
               {[null, "act", "validate", "monitor", "park"].map((q) => (
                 <Link
                   key={q ?? "all"}
@@ -110,14 +124,23 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                   {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
                 </Link>
               ))}
+              <Link href={`/vehicles/${code}?q=quick`} scroll={false} className="filter-chip" aria-current={qFilter === "quick" ? "true" : undefined} title="Customers ask for equipment BMW already sells">
+                Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
+              </Link>
             </div>
+            {active && (
+              <p className="mt-3 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[11px] text-ink-2" data-testid="ranking-note">
+                <b>Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
+                <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+              </p>
+            )}
             <div className="mt-4 flex items-baseline justify-between gap-3">
               <h2 className="text-[12px] font-semibold">Ranked by priority</h2>
               <span className="text-[10px] text-ink-3">MoSCoW, highest first</span>
             </div>
           </div>
           <div className="requirement-rows">
-            {reqs.length === 0 && <p className="empty-state">No requirements with evidence in {viewer.label}.</p>}
+            {reqs.length === 0 && <p className="empty-state">No {qFilter === "quick" ? "quick wins" : "requirements"} with evidence in {viewer.label}.</p>}
             {MOSCOW.map((m, gi) => {
               const next = MOSCOW[gi - 1]?.min ?? 101;
               const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
@@ -147,6 +170,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                             <span className="requirement-row-meta">
                               <span className="font-mono">{r.id}</span>
                               <QuadrantBadge q={r.quadrant} />
+                              {r.kind === "quick_win" && <QuickWinBadge />}
                               <StatusBadge s={r.status} />
                             </span>
                           </Link>

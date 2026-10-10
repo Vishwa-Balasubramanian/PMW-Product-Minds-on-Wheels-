@@ -115,8 +115,11 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
 .workspace-views a { padding: 13px 0 11px; white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--color-ink-3); border-bottom: 2px solid transparent; }
 .workspace-views a[aria-current=page] { color: var(--color-blue); border-bottom-color: var(--color-blue); }
 .vehicle-body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
-.vehicle-body.is-inbox { padding: 0; overflow: hidden; }
-.requirements-layout { display: grid; height: 100%; grid-template-columns: 420px minmax(0,1fr); }
+.vehicle-body.is-inbox { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.workspace-weights { flex-shrink: 0; max-height: 55%; overflow: auto; border-bottom: 1px solid var(--color-line); background: #fff; }
+.workspace-weights > .card { border: 0; border-radius: 0; }
+.workspace-weights > .card > button { padding: 10px 24px; }
+.requirements-layout { display: grid; flex: 1; min-height: 0; grid-template-columns: 420px minmax(0,1fr); }
 .requirements-list { display: flex; flex-direction: column; min-height: 0; background: #fff; border-right: 1px solid var(--color-line); }
 .list-toolbar { padding: 16px 16px 12px; border-bottom: 1px solid var(--color-line); flex-shrink: 0; }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }

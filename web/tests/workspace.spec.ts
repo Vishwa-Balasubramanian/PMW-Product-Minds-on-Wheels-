@@ -118,7 +118,7 @@ test('responsive workspace supports navigation, filters, detail and browser back
 
 test('all small-screen views and review tabs stay within the workspace', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
-  for (const route of ['/', '/vehicles/G70?view=matrix', '/vehicles/G70?view=signals', '/vehicles/G70?view=data', '/audit']) {
+  for (const route of ['/', '/vehicles/G70?view=matrix', '/vehicles/G70?view=signals', '/vehicles/G70?view=data', '/audit', '/workflow']) {
     await page.goto(route);
     await expectNoOverflow(page);
   }
@@ -130,6 +130,27 @@ test('all small-screen views and review tabs stay within the workspace', async (
     const detail = page.locator('.requirement-detail');
     expect(await detail.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   }
+});
+
+test('incoming workflow and weight controls fit the mobile workspace', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/vehicles/G70');
+  await page.getByRole('button', { name: /Priority weights/ }).click();
+  await expect(page.getByRole('slider')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Customer first', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Apply to the team', exact: true })).toBeEnabled();
+  await page.getByLabel('Reason', { exact: true }).fill('Preview only');
+  await expectNoOverflow(page);
+  expect(await page.locator('.workspace-weights').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+  await expect(page.locator('.requirement-row').first()).toBeInViewport();
+  await page.screenshot({ path: 'test-results/main-merge-weights-mobile.png' });
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Workspace navigation' }).getByRole('link', { name: 'Workflow', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'From customer voice to a decision a product manager can defend.' })).toBeVisible();
+  await expect(page.getByRole('main')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /Your region/ })).toHaveCount(1);
+  await expectNoOverflow(page);
+  await page.screenshot({ path: 'test-results/main-merge-workflow-mobile.png' });
 });
 
 test('workspace exports remain available on mobile and respect the selected region', async ({ page, context }) => {

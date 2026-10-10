@@ -12,6 +12,11 @@ export function QuadrantBadge({ q }: { q: Quadrant }) {
   return <span className={`badge ${Q_STYLE[q]}`}>{QUADRANT[q].label}</span>;
 }
 
+/** Equipment BMW already sells (requirement.kind === "quick_win"). */
+export function QuickWinBadge() {
+  return <span className="badge border border-blue text-blue">Quick win</span>;
+}
+
 const S_STYLE: Record<Status, string> = {
   proposed: "border border-line text-ink-2",
   edited: "bg-validate-soft text-validate",

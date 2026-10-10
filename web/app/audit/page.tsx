@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AuditTimeline } from "@/components/ui";
-import { auditLog } from "@/lib/gate";
+import { auditLog, getViewer } from "@/lib/gate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   const sp = await searchParams;
   const vehicle = typeof sp.vehicle === "string" ? sp.vehicle : "";
   const who = typeof sp.who === "string" ? sp.who : "";
-  let events = await auditLog({ vehicle: vehicle || undefined, limit: 600 });
+  const viewer = await getViewer();
+  let events = await auditLog(viewer, { vehicle: vehicle || undefined, limit: 600 });
   if (who) events = events.filter((e) => e.actor_type === who);
 
   return (

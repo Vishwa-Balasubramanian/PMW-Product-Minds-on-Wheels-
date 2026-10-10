@@ -28,7 +28,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const vehicle = VEHICLES.find((v) => pathname === `/vehicles/${v.code}`);
-  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : "Portfolio";
+  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : pathname === "/workflow" ? "Workflow" : "Portfolio";
 
   function navigation(mobile = false) {
     return (
@@ -47,6 +47,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
             </Link>
           ))}
           <p className="nav-label mt-7">Governance</p>
+          <Link href="/workflow" className="nav-item" aria-current={pathname === "/workflow" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Workflow</Link>
           <Link href="/audit" className="nav-item" aria-current={pathname === "/audit" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="audit" />Audit trail</Link>
         </nav>
         <div className="sidebar-footer"><BrandLogo /><span className="mb-2 block font-medium text-ink-2">Evidence → decisions</span>for BMW Group<br />Hackathon prototype</div>

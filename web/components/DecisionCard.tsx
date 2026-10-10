@@ -2,8 +2,18 @@ import type { Viewer } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
 import { ReviewTabs } from "./ReviewTabs";
+import { AlreadySellBanner } from "./AlreadySellBanner";
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
+
+/** Who drafted the requirement. Only output from an actual model is called an AI draft. */
+function draftLabel(generatedBy: string): string {
+  if (generatedBy.startsWith("llm:")) return "AI draft · needs validation";
+  if (generatedBy.startsWith("evidence-template")) return "Evidence-based draft · needs validation";
+  if (generatedBy === "equipment_matcher") return "Price-list match · needs validation";
+  if (generatedBy === "template") return "Template draft";
+  return "Draft · needs validation";
+}
 
 const PENDING = "Further evidence is needed before this step can be completed.";
 
@@ -34,7 +44,7 @@ function Ladder({ r }: { r: Requirement }) {
 function QuoteItem({ q }: { q: Quote }) {
   const strong = q.severity === "serious" || q.severity === "very serious";
   return (
-    <li className={`border-l-2 pl-4 ${q.role === "contradicts" ? "border-act" : strong ? "border-danger" : "border-line"}`}>
+    <li id={`comment-${q.id}`} tabIndex={-1} className={`scroll-mt-[128px] border-l-2 pl-4 ${q.role === "contradicts" ? "border-act" : strong ? "border-danger" : "border-line"}`}>
       <p className="text-[13px] text-ink">“{q.text.length > 420 ? q.text.slice(0, 420) + "…" : q.text}”</p>
       <p className="mt-1 flex flex-wrap gap-x-3 text-[12px] text-ink-3">
         <span className="font-mono text-blue">{q.id}</span>
@@ -79,7 +89,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2"><MoscowBadge p={r.priority} /><QuadrantBadge q={r.quadrant} /><StatusBadge s={r.status} /><span className="ml-auto text-[11px] text-ink-2 tabular-nums">Priority <b>{r.priority}</b> <span className="mx-1 text-line">/</span> Confidence <b>{r.confidence}</b></span></div>
-        <p className="mt-3 text-[11px] text-ink-3">{r.generated_by.startsWith("evidence-template") ? "Evidence-based draft · needs validation" : r.generated_by === "template" ? "Template draft" : "AI draft · needs validation"}</p>
+        <p className="mt-3 text-[11px] text-ink-3">{draftLabel(r.generated_by)}</p>
         <p className="mt-1 text-[11px] text-ink-3">Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</p>
       </header>
       <div className="decision-actions"><DecisionActions key={`${r.id}:${r.updated_at}`} r={r} /></div>
@@ -107,6 +117,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
 
       <ReviewTabs key={r.id}
         overview={<>
+          <AlreadySellBanner r={r} linkable={new Set([...supports.slice(0, 8), ...contradicts.slice(0, 3)].map((q) => q.id))} />
           <Section title="From customer voice to requirement">
             <Ladder r={r} />
           </Section>
