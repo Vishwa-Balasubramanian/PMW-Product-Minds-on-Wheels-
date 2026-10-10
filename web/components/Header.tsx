@@ -28,7 +28,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const vehicle = VEHICLES.find((v) => pathname === `/vehicles/${v.code}`);
-  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : pathname === "/workflow" ? "Workflow" : "Portfolio";
+  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : pathname === "/workflow" ? "Workflow" : pathname === "/portfolio" ? "Portfolio signals" : "Portfolio";
 
   function navigation(mobile = false) {
     return (
@@ -40,6 +40,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
         <nav aria-label={mobile ? "Mobile navigation" : "Main"} className="workspace-nav">
           <p className="nav-label">Workspace</p>
           <Link href="/" className="nav-item" aria-current={pathname === "/" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Portfolio</Link>
+          <Link href="/portfolio" className="nav-item" aria-current={pathname === "/portfolio" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Portfolio signals</Link>
           <p className="nav-label mt-7">Vehicle programs</p>
           {VEHICLES.map((v) => (
             <Link key={v.code} href={`/vehicles/${v.code}`} className="nav-item" aria-current={vehicle?.code === v.code ? "page" : undefined} onClick={() => drawer.current?.close()}>

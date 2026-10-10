@@ -168,6 +168,8 @@ CREATE TABLE IF NOT EXISTS requirements (
   contradictions TEXT NOT NULL,    -- JSON list
   survey TEXT NOT NULL,            -- JSON list of survey evidence rows
   conflicts TEXT NOT NULL,         -- JSON list of market conflicts that touch this requirement
+  evidence_mix TEXT,               -- JSON {observed, survey, inferred, assumed}, sums to 1; NULL before backfill
+  evidence_mix_by_market TEXT NOT NULL DEFAULT '{}', -- JSON market -> same mix, computed from that market's evidence
   priority INTEGER NOT NULL,       -- 0..100, deterministic
   priority_factors TEXT NOT NULL,  -- JSON {factor: {value, weight, note}}
   confidence INTEGER NOT NULL,     -- 0..100, deterministic, separate from priority

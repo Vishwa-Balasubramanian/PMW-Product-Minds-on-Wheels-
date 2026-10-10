@@ -5,6 +5,7 @@ export type Status = "proposed" | "approved" | "rejected" | "validate" | "edited
 
 export type Factor = { value: number; weight: number; note: string };
 export type Factors = Record<string, Factor>;
+export type EvidenceMix = { observed: number; survey: number; inferred: number; assumed: number };
 
 export type SurveyRow = {
   market: string;
@@ -54,6 +55,9 @@ export type Requirement = {
   contradictions: string[];
   survey: SurveyRow[];
   conflicts: Conflict[];
+  /** Gate selects the viewer's market mix. NULL means a legacy DB needs backfilling. */
+  evidence_mix: EvidenceMix | null;
+  evidence_mix_by_market: Record<string, EvidenceMix>;
   priority: number;
   priority_factors: Factors;
   confidence: number;

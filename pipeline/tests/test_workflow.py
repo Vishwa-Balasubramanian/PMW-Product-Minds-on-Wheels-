@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from pmw import ai, challenge, classify, cli, db, derive, drafts, evidence, ingest, score, signals, verify
+from pmw import ai, challenge, classify, cli, db, derive, drafts, evidence, evidence_mix, ingest, score, signals, verify
 from pmw.themes import member_topics, theme_for
 
 
@@ -269,6 +269,8 @@ class SuppliedDataTests(unittest.TestCase):
             evidence.build_conflicts(cls.con,vehicle)
             evidence.build_equipment_matches(cls.con,vehicle)
             cli.build_requirements(cls.con,vehicle,15,False,weights)
+        evidence_mix.refresh(cls.con)
+        cls.con.commit()
 
     @classmethod
     def tearDownClass(cls):
@@ -290,6 +292,74 @@ class SuppliedDataTests(unittest.TestCase):
 
     def test_china_has_no_invented_comments(self):
         self.assertEqual(self.con.execute("SELECT COUNT(*) FROM feedback WHERE market='CN'").fetchone()[0],0)
+
+    def test_all_requirements_have_normalized_global_and_market_mixes(self):
+        for row in self.con.execute('SELECT evidence_mix, evidence_mix_by_market FROM requirements'):
+            regional = json.loads(row['evidence_mix_by_market'])
+            self.assertEqual(set(regional), {'US', 'EU', 'CN', 'ROW'})
+            for mix in [json.loads(row['evidence_mix']), *regional.values()]:
+                self.assertEqual(set(mix), set(evidence_mix.KEYS))
+                self.assertAlmostEqual(sum(mix.values()), 1, places=6)
+                self.assertTrue(all(0 <= v <= 1 for v in mix.values()))
+
+    def test_survey_only_china_and_comment_heavy_us_use_their_own_sources(self):
+        rows = self.con.execute("SELECT evidence_mix_by_market FROM requirements WHERE vehicle='G70' AND kind='signal'").fetchall()
+        candidates = [json.loads(r[0]) for r in rows]
+        candidate = next(m for m in candidates if m['CN']['survey'] > 0 and m['US']['observed'] > 0)
+        self.assertEqual(candidate['CN']['observed'], 0)
+        self.assertGreater(candidate['US']['observed'], candidate['CN']['observed'])
+        self.assertTrue(all(m['CN']['observed'] == 0 for m in candidates))
+
+    def test_quick_win_composition_uses_feature_wishes_not_parent_theme(self):
+        for row in self.con.execute("SELECT * FROM requirements WHERE kind='quick_win'"):
+            ids = {fid for m in json.loads(row['already_exists']) for fid in m['feedback_ids']}
+            mix = json.loads(row['evidence_mix'])
+            self.assertEqual(mix['survey'], 0)
+            # Two assumption units vs four observed units at the 30-comment cap.
+            self.assertAlmostEqual(mix['observed'] / mix['assumed'], 2 * min(len(ids), 30) / 30, places=4)
+
+    def test_legacy_backfill_preserves_decisions_and_is_idempotent(self):
+        con = connection()
+        self.addCleanup(con.close)
+        self.con.commit()
+        self.con.backup(con)
+        con.execute('ALTER TABLE requirements DROP COLUMN evidence_mix')
+        con.execute('ALTER TABLE requirements DROP COLUMN evidence_mix_by_market')
+        con.execute("UPDATE requirements SET status='approved', requirement='PM reviewed wording', challenged=1 WHERE id=(SELECT id FROM requirements LIMIT 1)")
+        before = [dict(r) for r in con.execute('SELECT * FROM requirements ORDER BY id')]
+        audits = [dict(r) for r in con.execute('SELECT * FROM audit_events ORDER BY id')]
+        con.commit()
+        with con:
+            con.execute('BEGIN IMMEDIATE')
+            self.assertEqual(evidence_mix.refresh(con), len(before))
+        after = [{k: r[k] for k in before[0]} for r in con.execute('SELECT * FROM requirements ORDER BY id')]
+        self.assertEqual(before, after)
+        self.assertEqual(audits, [dict(r) for r in con.execute('SELECT * FROM audit_events ORDER BY id')][:-1])
+        with con:
+            self.assertEqual(evidence_mix.refresh(con), 0)
+        self.assertEqual(con.execute('SELECT COUNT(*) FROM audit_events').fetchone()[0], len(audits) + 1)
+
+    def test_failed_backfill_rolls_back_schema_and_history(self):
+        con = connection()
+        self.addCleanup(con.close)
+        con.execute('ALTER TABLE requirements DROP COLUMN evidence_mix')
+        con.execute('ALTER TABLE requirements DROP COLUMN evidence_mix_by_market')
+        con.commit()
+        with patch.object(evidence_mix, 'profiles', side_effect=ValueError('Invalid evidence')):
+            with self.assertRaises(ValueError), con:
+                con.execute('BEGIN IMMEDIATE')
+                evidence_mix.refresh(con)
+        self.assertNotIn('evidence_mix', {r[1] for r in con.execute('PRAGMA table_info(requirements)')})
+        self.assertEqual(con.execute('SELECT COUNT(*) FROM audit_events').fetchone()[0], 0)
+
+    def test_verify_rejects_tampered_evidence_mix(self):
+        self.con.execute('SAVEPOINT changed_mix')
+        try:
+            self.con.execute("UPDATE requirements SET evidence_mix='{}' WHERE id=(SELECT id FROM requirements LIMIT 1)")
+            self.assertTrue(any('evidence composition' in e for e in verify.inspect(self.con)['errors']))
+        finally:
+            self.con.execute('ROLLBACK TO changed_mix')
+            self.con.execute('RELEASE changed_mix')
 
     def test_theme_survey_is_deduplicated_union(self):
         theme='Connected services and phone integration'

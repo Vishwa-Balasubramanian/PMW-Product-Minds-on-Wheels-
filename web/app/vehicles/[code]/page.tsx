@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
+import { EvidenceMeter } from "@/components/EvidenceMeter";
 import { WeightsPanel } from "@/components/WeightsPanel";
 import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
@@ -185,7 +186,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         </aside>
         <div className="requirement-detail" key={selectedId}>
           <Link href={`/vehicles/${code}${qFilter ? `?q=${qFilter}` : ""}`} className="back-to-list" scroll={false}>← Back to requirements</Link>
-          {detail ? (
+          {detail ? (<>
+            <EvidenceMeter mix={detail.requirement.evidence_mix} region={viewer.label} />
             <DecisionCard
               r={detail.requirement}
               quotes={detail.quotes}
@@ -196,6 +198,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               viewer={viewer}
               siblings={all}
             />
+            </>
           ) : (
             <div className="empty-state"><p className="font-medium text-ink-2">No requirement selected</p><p className="mt-2">Choose a requirement from the list to review its evidence and make a decision.</p></div>
           )}

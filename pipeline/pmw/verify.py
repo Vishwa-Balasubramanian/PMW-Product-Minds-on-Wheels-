@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from . import derive, evidence, score
+from . import derive, evidence, evidence_mix, score
 from .config import RAW, SALES_FILE, STUDY_FILE, VEHICLES
 from .themes import THEME_VERSION, member_topics
 
@@ -48,6 +48,7 @@ def equipment_errors(con, requirement: dict) -> list[str]:
 def inspect(con, expected_per_vehicle: int = 15) -> dict:
     errors = []
     vehicles = {}
+    expected_mixes = evidence_mix.profiles(con)
     weights = json.loads(con.execute("SELECT value FROM settings WHERE key='weights'").fetchone()[0])
     for code in VEHICLES:
         reqs = [dict(r) for r in con.execute('SELECT * FROM requirements WHERE vehicle=? ORDER BY priority DESC, id', (code,))]
@@ -59,6 +60,10 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
         if len(quick_wins) > 5 or len(features) != len(set(features)):
             errors.append(f'{code}: quick wins must contain at most five distinct features')
         for r in reqs:
+            stored = {"ALL": json.loads(r.get('evidence_mix') or 'null'),
+                      **json.loads(r.get('evidence_mix_by_market') or '{}')}
+            if stored != expected_mixes[r['id']]:
+                errors.append(f"{r['id']}: missing or inconsistent evidence composition")
             if r['kind'] == 'quick_win':
                 errors.extend(equipment_errors(con, r))
             else:
