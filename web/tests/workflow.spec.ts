@@ -25,6 +25,40 @@ test('equipment quick win displays only its matching wishing comments', async ({
   } finally { con.close(); }
 });
 
+test('quick wins filter and "You already sell this" banner keep comment IDs inside the region', async ({ page, context }) => {
+  await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
+  const con = db();
+  try {
+    const r = con.prepare(`SELECT id,already_exists FROM requirements
+      WHERE vehicle='G60' AND kind='quick_win' AND title LIKE '%ventilated%'`).get() as { id: string; already_exists: string };
+    const ids = [...new Set((JSON.parse(r.already_exists) as { feedback_ids: string[] }[]).flatMap(m => m.feedback_ids))];
+    const market = (id: string) => (con.prepare('SELECT market FROM feedback WHERE id=?').get(id) as { market: string }).market;
+    const usIds = ids.filter(id => market(id) === 'US');
+    const otherIds = ids.filter(id => market(id) !== 'US');
+    expect(usIds.length).toBeGreaterThan(0);
+    expect(otherIds.length).toBeGreaterThan(0);
+    const quickWins = (con.prepare("SELECT id FROM requirements WHERE vehicle='G60' AND kind='quick_win' AND markets LIKE '%\"US\"%'")
+      .all() as { id: string }[]).map(q => q.id);
+
+    await page.goto(`/vehicles/G60?q=quick&req=${r.id}`);
+    await expect(page.getByRole('link', { name: `Quick wins ${quickWins.length}` })).toBeVisible();
+    const rows = await page.locator('aside li a').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+    expect(rows.sort()).toEqual([...quickWins].sort());
+
+    const banner = page.locator('section[aria-labelledby="already-sell-title"]');
+    await expect(banner.getByRole('heading', { name: 'You already sell this' })).toBeVisible();
+    await expect(banner).toContainText('Comfort Paket (7VB, €2,750)');
+    await expect(banner).toContainText('German price list, July 2026');
+    await expect(banner).toContainText(`${otherIds.length} comment${otherIds.length === 1 ? '' : 's'} from other markets not shown`);
+    const text = await banner.innerText();
+    for (const id of usIds) expect(text).toContain(id);
+    for (const id of otherIds) expect(text).not.toContain(id);
+    // Restricted IDs must not reach serialized client props either.
+    const html = await (await page.request.get(`/vehicles/G60?q=quick&req=${r.id}`)).text();
+    for (const blob of html.match(/feedback_ids\\?":\[[^\]]*\]/g) ?? []) for (const id of otherIds) expect(blob).not.toContain(id);
+  } finally { con.close(); }
+});
+
 test('G70 displays a complete offline requirement ladder', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const errors: string[] = [];

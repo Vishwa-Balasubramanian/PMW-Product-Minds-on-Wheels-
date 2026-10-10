@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { Header } from "@/components/Header";
 import { ScrollToCard } from "@/components/ScrollToCard";
-import { MOSCOW, Matrix, QuadrantBadge, Section, StatusBadge } from "@/components/ui";
+import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, vehicleTotals,
@@ -29,12 +29,14 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   if (!vehicle) notFound();
   const viewer = await getViewer();
   const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
-  const qFilter = typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
+  // List filter: a quadrant, or "quick" for quick wins (equipment BMW already sells).
+  const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels] = await Promise.all([
     listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(),
   ]);
-  const reqs = qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const quickWins = all.filter((r) => r.kind === "quick_win");
+  const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
@@ -112,28 +114,36 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
 
   async function Inbox() {
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
-    const events = detail ? await auditFor(detail.requirement.id) : [];
+    const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
       <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="flex flex-col gap-3 lg:sticky lg:top-[140px] lg:max-h-[calc(100vh-170px)] lg:self-start">
-          <div className="flex flex-wrap gap-1.5">
-            {[null, "act", "validate", "monitor", "park"].map((q) => (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter requirements">
+            {([null, "act", "validate", "monitor", "park"] as const).map((q) => (
               <Link
                 key={q ?? "all"}
                 href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
                 scroll={false}
                 className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === q ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink"}`}
               >
-                {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
+                {q ? QUADRANT[q].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
               </Link>
             ))}
+            <Link
+              href={`/vehicles/${code}?q=quick`}
+              scroll={false}
+              title="Customers ask for equipment BMW already sells"
+              className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === "quick" ? "border-blue bg-blue text-white" : "border-blue text-blue hover:bg-monitor-soft"}`}
+            >
+              Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
+            </Link>
           </div>
           <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
             <h2 className="whitespace-nowrap text-[15px] font-semibold">Ranked by priority</h2>
             <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
           </div>
           <div className="flex flex-col overflow-y-auto">
-            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No requirements with evidence in {viewer.label}.</p>}
+            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No {qFilter === "quick" ? "quick wins" : "requirements"} with evidence in {viewer.label}.</p>}
             {MOSCOW.map((m, gi) => {
               const next = MOSCOW[gi - 1]?.min ?? 101;
               const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
@@ -161,6 +171,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                             <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
                               {r.aspect && <span>{r.aspect} · {r.part}</span>}
                               <QuadrantBadge q={r.quadrant} />
+                              {r.kind === "quick_win" && <QuickWinBadge />}
                               {r.status !== "proposed" && <StatusBadge s={r.status} />}
                             </span>
                           </Link>

@@ -1,6 +1,7 @@
 import type { Viewer } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
+import { AlreadySellBanner } from "./AlreadySellBanner";
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
@@ -33,7 +34,7 @@ function Ladder({ r }: { r: Requirement }) {
 function QuoteItem({ q }: { q: Quote }) {
   const strong = q.severity === "serious" || q.severity === "very serious";
   return (
-    <li className={`border-l-2 pl-4 ${q.role === "contradicts" ? "border-act" : strong ? "border-danger" : "border-line"}`}>
+    <li id={`comment-${q.id}`} className={`scroll-mt-[150px] border-l-2 pl-4 ${q.role === "contradicts" ? "border-act" : strong ? "border-danger" : "border-line"}`}>
       <p className="text-[15px] text-ink">“{q.text.length > 420 ? q.text.slice(0, 420) + "…" : q.text}”</p>
       <p className="mt-1 flex flex-wrap gap-x-3 text-[12px] text-ink-3">
         <span className="font-mono text-blue">{q.id}</span>
@@ -96,6 +97,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           <span>· {r.generated_by.startsWith("evidence-template") ? "Evidence-based draft · needs validation" : r.generated_by === "template" ? "Template draft" : "AI draft · needs validation"}</span>
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
+        <AlreadySellBanner r={r} linkable={new Set([...supports.slice(0, 8), ...contradicts.slice(0, 3)].map((q) => q.id))} />
         <DecisionActions key={`${r.id}:${r.updated_at}`} r={r} />
       </header>
 
