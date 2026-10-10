@@ -9,7 +9,7 @@ import json
 from collections import Counter
 import hashlib
 
-from . import aspects, challenge, db, derive, evidence, ingest, score, signals, verify
+from . import aspects, challenge, db, derive, evidence, ingest, market_requirements, score, signals, verify
 from .config import DB_PATH, MARKETS, VEHICLES
 from .themes import photo_topic
 
@@ -130,8 +130,7 @@ def build_quick_wins(con, vehicle: str, limit: int = 5, *, weights: dict | None 
         # Keep a topic link for navigation; all evidence and scores below belong to this feature.
         matches.sort(key=lambda m: (-len(m["feedback_ids"]), m["signal_or_requirement_id"], m["code"] or "", m["source_vehicle"]))
         representative = matches[0]
-        topic = con.execute("SELECT topic FROM signals WHERE id=?", (representative["signal_or_requirement_id"],)).fetchone()[0]
-        a = aspects.for_topic(vehicle, photo_topic(topic))
+        a = aspects.for_topic(vehicle, feature)
         standard = next((m for m in matches if m["match_type"] == "standard_other_vehicle"), None)
         packaged = next((m for m in matches if m["match_type"] == "package_same_vehicle"), None)
         option = next((m for m in matches if m["match_type"] == "option_same_vehicle"), None)
@@ -210,11 +209,12 @@ def build(args) -> None:
             "SELECT COUNT(*) FROM feedback f WHERE vehicle=? AND NOT EXISTS "
             "(SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL)", (code,)).fetchone()[0]
         signals.build(con, code)
+        evidence.record_survey_coverage(con, code, args.top)
         evidence.build_representation(con, code)
         evidence.build_conflicts(con, code)
         evidence.build_equipment_matches(con, code)
         n = build_requirements(con, code, args.top, args.llm, weights)
-        stats[code]["requirements"] = n
+        stats[code]["requirements"] = n + market_requirements.build(con, code, weights)
     con.commit()
     print(f"Database: {DB_PATH}")
     for code, s in stats.items():

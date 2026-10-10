@@ -13,7 +13,7 @@ from pdfminer.layout import LTContainer, LTTextLine
 
 from . import db
 from .config import (POWERTRAIN, RAW, SALES_FILE, STUDY_FILE, VEHICLES, country_to_market)
-from .scope import survey_attribute_scope
+from .scope import apply_text_scope, survey_attribute_scope
 
 SEVERITY_RE = re.compile(r"^I had (?:a|an)\s*(very minor|minor|serious|very serious)?\s*problem", re.I)
 COMPETITORS = {
@@ -310,6 +310,7 @@ def validate_equipment_facts(con) -> None:
 def run(con) -> dict:
     ingest_vehicles(con)
     stats = {code: ingest_feedback(con, code) for code in VEHICLES}
+    apply_text_scope(con)
     ingest_studies(con)
     ingest_sales(con)
     for code in VEHICLES:

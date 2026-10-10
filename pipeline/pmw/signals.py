@@ -43,6 +43,7 @@ def classify_unlabelled(con, vehicle: str, use_llm: bool = False) -> int:
     """Keep BMW labels intact; record AI and conservative rule labels separately."""
     comments = [dict(r) for r in con.execute(
         "SELECT f.id, f.text FROM feedback f WHERE f.vehicle=? AND f.classified=0 "
+        "AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=f.id AND x.in_scope=0) "
         "AND NOT EXISTS (SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL) "
         "ORDER BY f.id", (vehicle,))]
     topics = {r[0] for r in con.execute(
@@ -87,7 +88,9 @@ def build(con, vehicle: str) -> list[str]:
         """SELECT f.id, f.source, f.market, f.text, f.severity, f.competitors,
                   l.feedback_type, l.topic, l.subtopic
            FROM feedback f JOIN feedback_labels l ON l.feedback_id = f.id
-           WHERE f.vehicle = ? AND l.topic IS NOT NULL ORDER BY f.id, l.topic, l.feedback_type""", (vehicle,)).fetchall()
+           WHERE f.vehicle = ? AND l.topic IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=f.id AND x.in_scope=0)
+           ORDER BY f.id, l.topic, l.feedback_type""", (vehicle,)).fetchall()
 
     by_topic: dict[str, dict[str, dict]] = defaultdict(dict)
     for r in rows:
@@ -133,6 +136,8 @@ def build(con, vehicle: str) -> list[str]:
             (sid, vehicle, s["topic"], len(s["comments"]), len(s["neg"]), len(s["likes"]), s["n_hard"], s["n_defect"],
              s["n_wants"], s["dominant"], s["severity"], s["competitors"], json.dumps(s["by_market"]),
              json.dumps(s["by_source"]), int(ok), why))
+        con.executemany("INSERT INTO signal_feedback (signal_id,feedback_id) VALUES (?,?)",
+                        [(sid, fid) for fid in s['neg']])
         for fid, _ in select_evidence(s['neg'], 40):
             con.execute("INSERT INTO signal_evidence (signal_id, feedback_id, role) VALUES (?,?,?)", (sid, fid, "supports"))
         for fid, _ in select_evidence(s['likes'], 10):
@@ -142,5 +147,5 @@ def build(con, vehicle: str) -> list[str]:
                      action="excluded signal from requirements", rationale=why)
         ids.append(sid)
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id=vehicle,
-             action="detected signals", after=f"{len(ids)} themes with customer comments; map {THEME_VERSION}")
+             action="detected signals", after=f"{len(ids)} themes with customer comments; map {THEME_VERSION}; full negative membership retained")
     return ids

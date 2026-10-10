@@ -18,7 +18,12 @@ export type SurveyRow = {
   gap: number;
 };
 
-export type Conflict = { vehicle: string; attribute: string; cn: number; eu: number; delta: number };
+export type Conflict = {
+  vehicle: string; attribute: string; cn: number; eu: number; delta: number;
+  study?: "CN_EU_2025";
+  sales_year?: number;
+  sales_weights?: Record<string, number | null>;
+};
 
 export type Challenge = {
   issues: { penalty: number; text: string }[];
@@ -29,6 +34,8 @@ export type Challenge = {
 };
 
 export type LabelSource = "bmw" | "ai" | "rule";
+
+export type FeedbackScope = { feedback_id: string; in_scope: boolean; reason: string };
 
 export type Requirement = {
   id: string;
@@ -126,6 +133,18 @@ export type Signal = {
   in_scope: boolean;
   scope_reason: string | null;
   requirement_id: string | null;
+};
+
+/** Complete negative membership, distinct from the sampled signal_evidence table. */
+export type SignalFeedback = { signal_id: string; feedback_id: string };
+
+/** Evidence coverage by approved requirements, not measured customer satisfaction. */
+export type HappinessRow = {
+  market: string;
+  negativeComments: number;
+  coveredComments: number;
+  share: number | null;
+  salesWeight: number | null;
 };
 
 export type Weights = {
