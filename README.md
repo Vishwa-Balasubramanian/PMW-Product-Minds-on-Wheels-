@@ -39,12 +39,23 @@ Schema update: `equipment_matches.feature` identifies the feature; the placehold
 removed. Rebuild the database before running the updated app.
 
 Regression checks: `cd pipeline && uv run --extra llm python -m unittest discover -s tests -v`, then
-`cd ../web && node --test scripts/test-equipment-evidence.mjs && npx tsc --noEmit && npm run build`.
+`cd ../web && node --test scripts/test-equipment-evidence.mjs scripts/test-score.mjs && npx tsc --noEmit && npm run build`.
 Run `npm run test:e2e` after building; it uses a separate copy of the local database.
 
 **Priority display:** the list is grouped MoSCoW-style by priority score: Must have 65+, Should have 55+, Could have 45+,
 Won't have this time below 45 (`MOSCOW` in `web/components/ui.tsx`). The Act / Validate first / Monitor / Park chip is the
 separate decision quadrant (priority × confidence).
+
+**Priority weights and presets:** the "Priority weights" panel above the requirement list lets a product manager change
+how much each of the five priority factors counts (customer impact, frequency, market relevance, competitive pressure,
+future relevance), by slider or with a strategy preset: Customer first, Premium experience, Quick wins, China focus or
+Europe focus (defined and explained in `web/lib/score.ts`). A live preview shows how the top 5 would re-order before
+anything is saved. Apply needs a reason; the weights are stored team-wide in `settings.weights_active` and logged in the
+audit trail (who, region, before/after, why). While they are active, every page and export recomputes priority with the
+pipeline's formula, `round(100 × Σ weight·value / Σ weight)`, re-groups MoSCoW and re-derives the quadrant; confidence
+is never changed because it measures evidence, not strategy. The stored scores stay untouched, so Reset restores the
+original ranking exactly. `node --test scripts/test-score.mjs` proves the web formula reproduces every stored priority
+and quadrant under the default weights.
 
 ## Hosted demo
 

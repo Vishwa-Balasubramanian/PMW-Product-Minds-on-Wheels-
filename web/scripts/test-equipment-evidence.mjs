@@ -28,6 +28,7 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
       CREATE TABLE feedback (id TEXT, vehicle TEXT, text TEXT, source TEXT, market TEXT, country TEXT, powertrain TEXT, severity TEXT);
       CREATE TABLE signal_evidence (signal_id TEXT, feedback_id TEXT, role TEXT);
       CREATE TABLE signals (id TEXT, vehicle TEXT, n_negative INTEGER, in_scope INTEGER, by_market TEXT, by_source TEXT);
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE audit_events (ts TEXT, actor_type TEXT, actor TEXT, region TEXT, entity_type TEXT, entity_id TEXT,
         action TEXT, field TEXT, before TEXT, after TEXT, rationale TEXT);
       INSERT INTO signals VALUES ('S-G60-001','G60',100,1,'{}','{}');
@@ -51,6 +52,7 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
     const gate = loadTs("../lib/gate.ts", {
       "next/headers": { cookies: () => { throw new Error("Viewer is explicit in this test"); } },
       "./regions": loadTs("../lib/regions.ts"),
+      "./score": loadTs("../lib/score.ts"),
       "./db": {
         all,
         one: async (sql, args) => (await all(sql, args))[0],

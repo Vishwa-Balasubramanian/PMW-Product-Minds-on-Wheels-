@@ -5,6 +5,7 @@ import type { InStatement } from "@libsql/client";
 import { cookies } from "next/headers";
 import { all, nowIso, one, parse, writeBatch } from "./db";
 import { DEFAULT_REGION, MARKET_LABEL, MARKETS, REGIONS, REGION_COOKIE, isRegion, marketsFor, type Market, type RegionCode } from "./regions";
+import { PRIORITY_FACTORS, factorValues, quadrantOf, sensitivity, weightedScore, type PriorityWeights, type Thresholds } from "./score";
 import type { AuditEvent, Quote, Requirement, Signal, Weights } from "./types";
 
 export type Viewer = { region: RegionCode; markets: Market[]; label: string; actor: string };
@@ -129,10 +130,24 @@ async function restrictMatchIds(viewer: Viewer, reqs: Requirement[]): Promise<Re
 }
 
 export async function listRequirements(viewer: Viewer, vehicle: string): Promise<Requirement[]> {
-  const rows = await all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
-  const reqs = rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
-    .map((r) => restrictRawEvidence(viewer, r));
-  return restrictMatchIds(viewer, reqs);
+  const [rows, ranking] = await Promise.all([
+    all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]),
+    activeRanking(),
+  ]);
+  const list = await restrictMatchIds(
+    viewer,
+    rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
+      .map((r) => restrictRawEvidence(viewer, r)),
+  );
+  if (!ranking) return list;
+  // Stable sort: ties keep the stored (default-weight) order. The weights preview reproduces this rule client-side.
+  return list.map((r) => rescore(r, ranking)).sort((a, b) => b.priority - a.priority);
+}
+
+/** Requirement IDs in the stored (default-weight) order, the tie-break for any re-ranking. IDs only. */
+export async function storedOrder(vehicle: string): Promise<string[]> {
+  const rows = await all<{ id: string }>("SELECT id FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
+  return rows.map((r) => r.id);
 }
 
 export async function getRequirementRow(id: string): Promise<Requirement | undefined> {
@@ -166,7 +181,8 @@ export async function getRequirement(viewer: Viewer, id: string): Promise<Requir
   const hidden: Record<string, number> = {};
   for (const q of allQuotes) if (!viewer.markets.includes(q.market as Market)) hidden[q.market] = (hidden[q.market] ?? 0) + 1;
   await logAccess(viewer, id, Object.keys(hidden).length > 0);
-  const [requirement] = await restrictMatchIds(viewer, [restrictRawEvidence(viewer, req)]);
+  const ranking = await activeRanking();
+  const [requirement] = await restrictMatchIds(viewer, [restrictRawEvidence(viewer, ranking ? rescore(req, ranking) : req)]);
   if (viewer.region !== "ALL") {
     const voice = quotes.find((q) => q.role === "supports");
     requirement.customer_voice = voice ? `“${voice.text.slice(0, 260)}” (${voice.id})` : null;
@@ -322,6 +338,49 @@ export async function getWeights(): Promise<Weights> {
   return parse(r?.value, { priority: {}, confidence: {}, thresholds: { priority: 55, confidence: 62 } });
 }
 
+// ---------- active priority weights ----------
+// The pipeline stores priority and quadrant under the default weights (settings.weights). A product manager can
+// set strategy weights for the whole team (settings.weights_active, written by setWeights in actions.ts). While they
+// exist, every read below recomputes priority and quadrant from the stored factor values; the stored columns stay
+// untouched, so Reset restores the original numbers exactly. Confidence is never recomputed: it measures evidence.
+
+export type ActiveWeights = {
+  priority: PriorityWeights;
+  preset: string; // a key from PRESETS in score.ts, or "custom"
+  changed_by: string;
+  region: string;
+  changed_at: string;
+};
+
+export async function getActiveWeights(): Promise<ActiveWeights | null> {
+  const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'weights_active'");
+  const a = parse<ActiveWeights | null>(r?.value, null);
+  if (!a || typeof a !== "object" || !a.priority) return null;
+  const ok = PRIORITY_FACTORS.every((k) => typeof a.priority[k] === "number" && a.priority[k] >= 0)
+    && PRIORITY_FACTORS.some((k) => a.priority[k] > 0);
+  return ok ? a : null;
+}
+
+type Ranking = { weights: PriorityWeights; thresholds: Thresholds };
+
+async function activeRanking(): Promise<Ranking | null> {
+  const [active, w] = await Promise.all([getActiveWeights(), getWeights()]);
+  return active ? { weights: active.priority, thresholds: w.thresholds } : null;
+}
+
+/** Priority, quadrant, factor weights and priority sensitivity under the active weights. */
+function rescore(r: Requirement, { weights, thresholds }: Ranking): Requirement {
+  const values = factorValues(r.priority_factors);
+  const priority = weightedScore(values, weights);
+  const priority_factors = Object.fromEntries(
+    Object.entries(r.priority_factors).map(([k, f]) => [k, { ...f, weight: weights[k as keyof PriorityWeights] ?? f.weight }]),
+  );
+  const challenge = r.challenge.priority_sensitivity
+    ? { ...r.challenge, priority_sensitivity: sensitivity(values, weights, thresholds.priority) }
+    : r.challenge;
+  return { ...r, priority, priority_factors, challenge, quadrant: quadrantOf(priority, r.confidence, thresholds) };
+}
+
 export async function getFactorLabels(): Promise<Record<string, string>> {
   const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'factor_labels'");
   return parse(r?.value, {});
@@ -428,9 +487,16 @@ export async function workflowStats(): Promise<WorkflowStats> {
   const drafts = Object.fromEntries(
     (await all<{ g: string; n: number }>("SELECT generated_by g, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.g, Number(r.n)]),
   );
-  const quadrants = Object.fromEntries(
-    (await all<{ q: string; n: number }>("SELECT quadrant q, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.q, Number(r.n)]),
-  );
+  const ranking = await activeRanking();
+  const quadrants: Record<string, number> = ranking
+    ? (await all<{ priority_factors: string; confidence: number }>("SELECT priority_factors, confidence FROM requirements")).reduce((acc, r) => {
+      const q = quadrantOf(weightedScore(factorValues(parse(r.priority_factors, {})), ranking.weights), Number(r.confidence), ranking.thresholds);
+      acc[q] = (acc[q] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+    : Object.fromEntries(
+      (await all<{ q: string; n: number }>("SELECT quadrant q, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.q, Number(r.n)]),
+    );
   return { comments, surveyRows, equipmentRows, dataIssues, labelledByRules, signals, outOfScope, conflicts, equipmentMatches,
     requirements, quickWins, drafts, quadrants, decided, awaiting, auditEvents, pmEvents };
 }
