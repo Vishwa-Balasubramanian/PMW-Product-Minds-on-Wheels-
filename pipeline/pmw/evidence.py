@@ -6,6 +6,86 @@ Owner: Arjun. Next: extend TOPIC_TO_SURVEY, match equipment (Trickle-Down Finder
 from __future__ import annotations
 
 from .config import MARKETS
+from . import db
+
+# English customer language to German option-list wording. Terms are intentionally
+# narrow: a match is emitted only when the same phrase is present in a comment
+# and an equipment row, so a topic-level similarity never becomes a claimed fact.
+EQUIPMENT_GLOSSARY = {
+    "ventilated seats": ("ventilat", "sitzbelüftung", "sitzbelueftung"),
+    "comfort access": ("comfort access", "keyless", "komfortzugang"),
+    "multi-contour seats": ("multi-contour", "multi contour", "multicontour", "multifunktionssitze"),
+    "surround view": ("surround view", "surround view system", "surround-view"),
+    "wireless charging": ("wireless charging", "wireless charger", "wireless charging ablage", "induktive lade"),
+    "massage seats": ("massage",),
+    "heated steering wheel": ("heated steering wheel", "lenkradheizung"),
+    "head-up display": ("head-up display", "head up display"),
+    "sun blinds": ("sun blind", "sonnenschutzrollo"),
+    "ambient lighting": ("ambient light", "ambientes licht"),
+}
+
+
+def build_equipment_matches(con, vehicle: str) -> None:
+    """Link only literal bilingual comment/equipment matches, retaining IDs and source rows."""
+    con.execute("DELETE FROM equipment_matches WHERE vehicle = ?", (vehicle,))
+    sigs = con.execute("SELECT id, topic FROM signals WHERE vehicle = ? AND in_scope = 1", (vehicle,)).fetchall()
+    for sig in sigs:
+        feedback = con.execute(
+            "SELECT DISTINCT f.id, f.text FROM feedback f JOIN feedback_labels l ON l.feedback_id=f.id "
+            "WHERE f.vehicle=? AND l.topic=? AND l.feedback_type IN ('Wants','Difficult to Use','Defect')",
+            (vehicle, sig["topic"])).fetchall()
+        if not feedback:
+            continue
+        for english, terms in EQUIPMENT_GLOSSARY.items():
+            hits = [f for f in feedback if any(t in f["text"].casefold() for t in terms if " " in t or len(t) > 6)]
+            if not hits:
+                continue
+            pending = {}
+            rows = con.execute("SELECT * FROM equipment WHERE vehicle=?", (vehicle,)).fetchall()
+            for row in rows:
+                name = (row["name"] or "").casefold()
+                if not any(t in name for t in terms):
+                    continue
+                failing_words = ("broken", "defective", "does not work", "not working", "malfunction",
+                                 "doesn't work", "stopped working", "not charging", "won't charge", "faulty")
+                failing_hits = [f for f in hits if any(w in f["text"].casefold() for w in failing_words)]
+                failing = english == "wireless charging" and row["availability"] == "standard" and bool(failing_hits)
+                match_type = ("standard_but_failing" if failing else
+                              "package_same_vehicle" if row["availability"] == "package_item" else
+                              "option_same_vehicle" if row["availability"] == "optional" else None)
+                if match_type is None:
+                    continue
+                matched_hits = failing_hits if failing else hits
+                ids = sorted({f["id"] for f in matched_hits})
+                name_clean = row["name"].lstrip("–- ").strip()
+                item_code, item_price = row["code"], row["price_eur"]
+                package_note = ""
+                if row["availability"] == "package_item" and row["package"]:
+                    parent = con.execute("SELECT name,code,price_eur FROM equipment WHERE vehicle=? AND lower(name)=lower(?) "
+                                         "AND code IS NOT NULL ORDER BY price_eur DESC LIMIT 1", (vehicle, row["package"])).fetchone()
+                    if parent:
+                        item_code, item_price = parent["code"], parent["price_eur"]
+                        package_note = f" Package: {parent['name']} ({parent['code']}, €{parent['price_eur']:,.0f})."
+                note = f"Customer wording '{english}' matches the German equipment row '{name_clean}'.{package_note} Price list: Germany, July 2026."
+                key = (match_type, name_clean, item_code, item_price, vehicle)
+                pending.setdefault(key, {"ids": set(), "note": note})["ids"].update(ids)
+            # A standard feature on another BMW is a trickle-down candidate.
+            for other in con.execute("SELECT * FROM equipment WHERE vehicle<>? AND availability='standard'", (vehicle,)).fetchall():
+                name = (other["name"] or "").casefold()
+                if any(t in name for t in terms):
+                    ids = sorted({f["id"] for f in hits})
+                    name_clean = other["name"].lstrip("–- ").strip()
+                    key = ("standard_other_vehicle", name_clean, other["code"], other["price_eur"], other["vehicle"])
+                    pending.setdefault(key, {"ids": set(), "note":
+                        f"{name_clean} is marked standard on {other['vehicle']} in its German price list."})["ids"].update(ids)
+            for (match_type, name, option_code, price, source_vehicle), values in pending.items():
+                ids = sorted(values["ids"])
+                con.execute("INSERT INTO equipment_matches VALUES (?,?,?,?,?,?,?,?,?)",
+                            (vehicle, sig["id"], match_type, name, option_code, price, source_vehicle,
+                             db.dumps(ids), values["note"]))
+                db.audit(con, actor_type="system", actor="Pipeline", entity_type="signal", entity_id=sig["id"],
+                         action="matched customer evidence to equipment", after=f"{match_type}: {name}",
+                         rationale=f"Comment IDs: {', '.join(ids)}; source equipment row retained in equipment.raw")
 
 # BMW topic (taxonomy level 2) -> survey attributes. Prefix match, case-insensitive.
 # "us" = US_2025 questions, "cneu" = CN_EU_2025 attributes.
