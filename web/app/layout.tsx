@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Header } from "@/components/Header";
+import { getViewer } from "@/lib/gate";
 
 // Font: Albert Sans (stand-in for BMW Type Next), self-hosted in public/fonts, see globals.css.
 // No analytics, no third-party requests. Search engines are told not to index (also robots.ts and next.config headers).
@@ -14,10 +16,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const viewer = await getViewer();
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body>
+        <Header viewer={viewer} />
+        <main id="workspace-main" tabIndex={-1} className="workspace-main">{children}</main>
+      </body>
     </html>
   );
 }

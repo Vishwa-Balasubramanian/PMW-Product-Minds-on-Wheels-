@@ -8,7 +8,7 @@ const Q_STYLE: Record<Quadrant, string> = {
 };
 
 export function QuadrantBadge({ q }: { q: Quadrant }) {
-  return <span className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.06em] ${Q_STYLE[q]}`}>{QUADRANT[q].label}</span>;
+  return <span className={`badge ${Q_STYLE[q]}`}>{QUADRANT[q].label}</span>;
 }
 
 const S_STYLE: Record<Status, string> = {
@@ -21,7 +21,7 @@ const S_STYLE: Record<Status, string> = {
 
 export function StatusBadge({ s, onDark = false }: { s: Status; onDark?: boolean }) {
   const style = onDark && s === "proposed" ? "bg-white text-ink" : S_STYLE[s];
-  return <span className={`inline-flex h-6 items-center px-2 text-[12px] font-medium ${style}`}>{STATUS_LABEL[s]}</span>;
+  return <span className={`badge ${style}`}>{STATUS_LABEL[s]}</span>;
 }
 
 /** MoSCoW group from the priority score. Should starts at the decision-matrix threshold (55). */
@@ -38,7 +38,7 @@ export function moscowFor(priority: number) {
 
 export function MoscowBadge({ p }: { p: number }) {
   const m = moscowFor(p);
-  return <span className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold text-white ${m.bg}`}>{m.label}</span>;
+  return <span className={`badge text-white ${m.bg}`}>{m.label}</span>;
 }
 
 export function ScorePair({ r, size = "sm" }: { r: Pick<Requirement, "priority" | "confidence">; size?: "sm" | "lg" }) {
@@ -47,11 +47,11 @@ export function ScorePair({ r, size = "sm" }: { r: Pick<Requirement, "priority" 
     <div className={`flex ${big ? "gap-8" : "gap-4"} tabular-nums`}>
       <div>
         <div className={big ? "eyebrow" : "text-[11px] uppercase tracking-[0.1em] text-ink-3"}>Priority</div>
-        <div className={big ? "text-[44px] font-light leading-none" : "text-[20px] font-medium leading-none"}>{r.priority}</div>
+        <div className={big ? "text-[32px] font-semibold leading-none" : "text-[20px] font-medium leading-none"}>{r.priority}</div>
       </div>
       <div>
         <div className={big ? "eyebrow" : "text-[11px] uppercase tracking-[0.1em] text-ink-3"}>Confidence</div>
-        <div className={big ? "text-[44px] font-light leading-none" : "text-[20px] font-medium leading-none"}>{r.confidence}</div>
+        <div className={big ? "text-[32px] font-semibold leading-none" : "text-[20px] font-medium leading-none"}>{r.confidence}</div>
       </div>
     </div>
   );
@@ -154,8 +154,8 @@ export function AuditTimeline({ events }: { events: AuditEvent[] }) {
 
 export function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="card p-6">
-      <div className="mb-4 flex items-baseline justify-between gap-4">
+    <section className="card p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 className="eyebrow">{title}</h3>
         {aside && <div className="text-[12px] text-ink-3">{aside}</div>}
       </div>

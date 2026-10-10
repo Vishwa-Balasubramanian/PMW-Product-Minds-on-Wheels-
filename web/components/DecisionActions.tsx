@@ -80,19 +80,19 @@ export function DecisionActions({ r }: { r: Requirement }) {
 
       {mode && (
         <form
-          className="flex flex-col gap-3 border border-line bg-mist p-4"
+          className="flex flex-col gap-3 rounded-md border border-line bg-mist p-4"
           onSubmit={(e) => { e.preventDefault(); send(mode); }}
         >
           {mode === "edit" && (
             <>
               <label className="flex flex-col gap-1 text-[13px] font-medium">Title
-                <input id="edit-title" className="border border-line bg-white px-3 py-2 font-light" value={fields.title} onChange={(e) => setFields({ ...fields, title: e.target.value })} />
+                <input id="edit-title" className="border border-line bg-white px-3 py-2 font-normal" value={fields.title} onChange={(e) => setFields({ ...fields, title: e.target.value })} />
               </label>
               <label className="flex flex-col gap-1 text-[13px] font-medium">Customer need
-                <textarea id="edit-need" rows={2} className="border border-line bg-white px-3 py-2 font-light" value={fields.customer_need} onChange={(e) => setFields({ ...fields, customer_need: e.target.value })} />
+                <textarea id="edit-need" rows={2} className="border border-line bg-white px-3 py-2 font-normal" value={fields.customer_need} onChange={(e) => setFields({ ...fields, customer_need: e.target.value })} />
               </label>
               <label className="flex flex-col gap-1 text-[13px] font-medium">Requirement
-                <textarea id="edit-req" rows={3} className="border border-line bg-white px-3 py-2 font-light" value={fields.requirement} onChange={(e) => setFields({ ...fields, requirement: e.target.value })} />
+                <textarea id="edit-req" rows={3} className="border border-line bg-white px-3 py-2 font-normal" value={fields.requirement} onChange={(e) => setFields({ ...fields, requirement: e.target.value })} />
               </label>
             </>
           )}
@@ -101,7 +101,7 @@ export function DecisionActions({ r }: { r: Requirement }) {
             <input
               id="decision-why"
               autoFocus
-              className="border border-line bg-white px-3 py-2 font-light"
+              className="border border-line bg-white px-3 py-2 font-normal"
               placeholder={PROMPT[mode].placeholder}
               value={why}
               onChange={(e) => setWhy(e.target.value)}

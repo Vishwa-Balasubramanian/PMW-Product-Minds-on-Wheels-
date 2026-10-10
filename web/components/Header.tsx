@@ -1,48 +1,73 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useRef } from "react";
 import type { Viewer } from "@/lib/gate";
 import { RegionPicker } from "./RegionPicker";
 
-export function Wordmark({ light = false }: { light?: boolean }) {
+const VEHICLES = [
+  { code: "G70", label: "7 Series" },
+  { code: "G60", label: "5 Series" },
+  { code: "F70", label: "1 Series" },
+];
+
+function NavIcon({ kind }: { kind: "portfolio" | "vehicle" | "audit" }) {
   return (
-    <Link href="/" className={`flex items-center gap-3 ${light ? "text-white" : "text-ink"}`}>
-      <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-current text-[13px] font-bold tracking-wide">
-        PMW
-      </span>
-      <span className="hidden text-[13px] leading-tight sm:block">
-        <span className="block font-semibold uppercase tracking-[0.08em]">Product Minds</span>
-        <span className="block font-light uppercase tracking-[0.08em]">on Wheels</span>
-      </span>
-    </Link>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      {kind === "portfolio" ? <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>
+        : kind === "audit" ? <path d="M5 4h14v17H5zM9 2v4m6-4v4M8 10h8M8 14h8M8 18h5" />
+          : <path d="m5 9 2-5h10l2 5M3 10h18v8H3zM5 18v3m14-3v3M3 13h4m10 0h4" />}
+    </svg>
   );
 }
 
-const NAV = [
-  { href: "/vehicles/G70", label: "7 Series" },
-  { href: "/vehicles/G60", label: "5 Series" },
-  { href: "/vehicles/F70", label: "1 Series" },
-  { href: "/audit", label: "Audit trail" },
-];
+export function Header({ viewer }: { viewer: Viewer }) {
+  const pathname = usePathname();
+  const drawer = useRef<HTMLDialogElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const vehicle = VEHICLES.find((v) => pathname === `/vehicles/${v.code}`);
+  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : "Portfolio";
 
-/** variant "overlay" sits on top of photography (home). "solid" is the white app header. */
-export function Header({ viewer, variant = "solid" }: { viewer: Viewer; variant?: "overlay" | "solid" }) {
-  const light = variant === "overlay";
+  function navigation(mobile = false) {
+    return (
+      <>
+        <Link href="/" className="workspace-brand" onClick={() => drawer.current?.close()} aria-label="PMW portfolio">
+          <span className="brand-symbol">p<span className="text-blue">.</span></span>
+          <span><b className="block text-[15px] tracking-tight">Product Minds</b><span className="text-[11px] text-ink-3">on Wheels</span></span>
+        </Link>
+        {mobile && <button className="drawer-close" onClick={() => drawer.current?.close()} aria-label="Close navigation">×</button>}
+        <nav aria-label={mobile ? "Mobile navigation" : "Main"} className="workspace-nav">
+          <p className="nav-label">Workspace</p>
+          <Link href="/" className="nav-item" aria-current={pathname === "/" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Portfolio</Link>
+          <p className="nav-label mt-7">Vehicle programs</p>
+          {VEHICLES.map((v) => (
+            <Link key={v.code} href={`/vehicles/${v.code}`} className="nav-item" aria-current={vehicle?.code === v.code ? "page" : undefined} onClick={() => drawer.current?.close()}>
+              <NavIcon kind="vehicle" /><span>{v.label}</span><span className="ml-auto font-mono text-[11px] opacity-65">{v.code}</span>
+            </Link>
+          ))}
+          <p className="nav-label mt-7">Governance</p>
+          <Link href="/audit" className="nav-item" aria-current={pathname === "/audit" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="audit" />Audit trail</Link>
+        </nav>
+        <div className="sidebar-footer"><span className="mb-2 block font-medium text-ink-2">Evidence → decisions</span>Product Minds on Wheels<br />BMW challenge workspace</div>
+      </>
+    );
+  }
+
   return (
-    <header className={light ? "absolute inset-x-0 top-0 z-30" : "sticky top-0 z-30 bg-white"}>
-      <div className="container-x">
-        <div className={`flex h-[84px] items-center gap-8 border-b ${light ? "border-white/60" : "border-line"}`}>
-          <Wordmark light={light} />
-          <nav className="hidden items-center gap-7 md:flex" aria-label="Main">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className={`text-[15px] font-medium ${light ? "text-white hover:text-white/75" : "text-ink hover:text-blue"}`}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="ml-auto">
-            <RegionPicker region={viewer.region} light={light} />
-          </div>
-        </div>
-      </div>
-    </header>
+    <>
+      <a className="skip-link" href="#workspace-main">Skip to workspace</a>
+      <aside className="workspace-sidebar">{navigation()}</aside>
+      <header className="workspace-topbar">
+        <button ref={menuButton} className="menu-button" aria-label="Open navigation" aria-haspopup="dialog" onClick={() => drawer.current?.showModal()}>
+          <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <div className="flex min-w-0 items-center gap-2 text-[13px]"><span className="hidden text-ink-3 sm:inline">Workspace</span><span className="hidden text-line sm:inline">/</span><span className="truncate font-medium">{title}</span></div>
+        <div className="ml-auto shrink-0"><RegionPicker region={viewer.region} /></div>
+      </header>
+      <dialog ref={drawer} aria-label="Workspace navigation" className="navigation-drawer" onClose={() => menuButton.current?.focus()} onClick={(e) => { if (e.target === drawer.current) drawer.current.close(); }}>
+        <div className="flex min-h-full flex-col">{navigation(true)}</div>
+      </dialog>
+    </>
   );
 }

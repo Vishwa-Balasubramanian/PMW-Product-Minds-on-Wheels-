@@ -27,10 +27,12 @@ test('challenge reduces confidence, moves quadrant and records an audit trail', 
       { id: string; confidence: number; challenge: string };
     expect(r).toBeTruthy();
     await page.goto(`/vehicles/G70?req=${r.id}`);
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
     await page.getByRole('button', { name: 'Challenge', exact: true }).click();
     await page.getByLabel('What do you doubt? (optional)').fill('Check missing market voices before approval.');
     await page.getByRole('button', { name: 'Run the challenge', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Challenge result', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Evidence', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText(/This recommendation could be wrong/)).toBeVisible();
     await expect(page.getByText(/Priority ranges from/)).toBeVisible();
     const updated = con.prepare('SELECT confidence,quadrant,challenged FROM requirements WHERE id=?').get(r.id) as
@@ -192,6 +194,7 @@ test('region picker reports failure and can retry successfully on mobile', async
   await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/vehicles/G70');
+  await page.locator('.requirement-row').first().click();
   await page.getByRole('button', { name: /Your region/ }).click();
   await page.getByRole('radio', { name: /^China/ }).check();
   await page.route('**/api/region', route => route.fulfill({ status: 503, body: 'Unavailable' }));

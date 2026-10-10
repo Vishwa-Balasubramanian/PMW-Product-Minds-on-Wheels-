@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
-import { Header } from "@/components/Header";
 import { MOSCOW, Matrix, QuadrantBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
@@ -38,55 +37,35 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
   return (
-    <main className="flex-1 bg-white">
-      <Header viewer={viewer} />
-
-      <section className="relative isolate overflow-hidden bg-night text-white">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/cars/${code}-wide.jpg`} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-60" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
-        <div className="container-x flex flex-col gap-5 py-12">
-          <p className="text-[13px] font-medium uppercase tracking-[0.14em] text-white/75">Requirements for the successor generation · {code}</p>
-          <h1 className="headline text-[40px] sm:text-[52px]">{vehicle.name}</h1>
-          <dl className="flex flex-wrap gap-x-10 gap-y-3 text-[14px]">
-            <div><dt className="text-white/60">Viewing as</dt><dd className="font-medium">{viewer.actor}</dd></div>
-            <div><dt className="text-white/60">Requirements in your region</dt><dd className="font-medium tabular-nums">{all.length}</dd></div>
-            <div><dt className="text-white/60">Awaiting decision</dt><dd className="font-medium tabular-nums">{awaiting}</dd></div>
-            <div><dt className="text-white/60">Comments analysed (all markets)</dt><dd className="font-medium tabular-nums">{totals.comments.toLocaleString("en-US")}</dd></div>
-          </dl>
-          {voices && (
-            <p className="max-w-[820px] border-l-2 border-validate bg-black/40 px-4 py-3 text-[14px] text-white/90">
-              <b className="uppercase tracking-[0.06em]">Missing voices.</b> {voices} Confidence is lowered accordingly.
-            </p>
-          )}
+    <div className="vehicle-workspace">
+      <section className="vehicle-summary">
+        <div className="vehicle-heading">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/cars/${code}-wide.jpg`} alt="" />
+          <div><h1 className="page-heading">{vehicle.name}</h1><p className="page-caption">{code} · Requirements for the successor generation</p></div>
         </div>
+        <dl className="vehicle-metrics">
+          <div><dd>{all.length}</dd><dt>requirements in your region</dt></div>
+          <div><dd className="text-blue">{awaiting}</dd><dt>awaiting decision</dt></div>
+          <div><dd>{totals.comments.toLocaleString("en-US")}</dd><dt>comments analysed (all markets)</dt></div>
+          <div className="viewer-metric"><dt>Viewing as</dt><dd>{viewer.actor}</dd></div>
+        </dl>
+        {voices && <p className="evidence-notice"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
       </section>
-
-      <nav className="sticky top-[84px] z-20 border-b border-line bg-white" aria-label="Views">
-        <div className="container-x flex gap-8 overflow-x-auto">
-          {VIEWS.map((v) => (
-            <Link
-              key={v.k}
-              href={`/vehicles/${code}?view=${v.k}`}
-              className={`whitespace-nowrap border-b-2 py-4 text-[15px] font-medium ${view === v.k ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
-            >
-              {v.label}
-            </Link>
-          ))}
-        </div>
+      <nav className="workspace-views" aria-label="Views">
+        {VIEWS.map((v) => <Link key={v.k} href={`/vehicles/${code}?view=${v.k}`} aria-current={view === v.k ? "page" : undefined}>{v.label}</Link>)}
       </nav>
-
-      <div className="container-x py-8">
+      <div className={`vehicle-body ${view === "inbox" ? "is-inbox" : ""}`}>
         {view === "inbox" && <Inbox />}
         {view === "matrix" && (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_1fr]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,640px)_1fr]">
             <Section title="Priority against confidence" aside="Click a dot to open the requirement">
               <Matrix items={all} thresholds={weights.thresholds} vehicle={code} size={640} />
             </Section>
             <div className="grid content-start gap-4 sm:grid-cols-2">
               {(Object.keys(QUADRANT) as Quadrant[]).map((q) => (
                 <div key={q} className="card p-5">
-                  <div className="flex items-center justify-between"><QuadrantBadge q={q} /><span className="text-[28px] font-light tabular-nums">{all.filter((r) => r.quadrant === q).length}</span></div>
+                  <div className="flex items-center justify-between"><QuadrantBadge q={q} /><span className="text-[28px] font-semibold tabular-nums">{all.filter((r) => r.quadrant === q).length}</span></div>
                   <p className="mt-2 text-[14px] text-ink-2">{QUADRANT[q].hint}.</p>
                 </div>
               ))}
@@ -100,41 +79,45 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         {view === "signals" && <Signals />}
         {view === "data" && <DataHealth />}
       </div>
-    </main>
+    </div>
   );
 
   async function Inbox() {
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
     const events = detail ? await auditFor(detail.requirement.id) : [];
     return (
-      <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-3 lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:self-start">
-          <div className="flex flex-wrap gap-1.5">
-            {[null, "act", "validate", "monitor", "park"].map((q) => (
-              <Link
-                key={q ?? "all"}
-                href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
-                className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === q ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink"}`}
-              >
-                {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
-              </Link>
-            ))}
+      <div className={`requirements-layout ${typeof sp.req === "string" && selectedId ? "has-selection" : ""}`}>
+        <aside className="requirements-list" aria-label="Requirements">
+          <div className="list-toolbar">
+            <div className="filter-chips" aria-label="Filter by quadrant">
+              {[null, "act", "validate", "monitor", "park"].map((q) => (
+                <Link
+                  key={q ?? "all"}
+                  href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
+                  className="filter-chip"
+                  aria-current={qFilter === q ? "true" : undefined}
+                  scroll={false}
+                >
+                  {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-4 flex items-baseline justify-between gap-3">
+              <h2 className="text-[12px] font-semibold">Ranked by priority</h2>
+              <span className="text-[10px] text-ink-3">MoSCoW, highest first</span>
+            </div>
           </div>
-          <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
-            <h2 className="whitespace-nowrap text-[15px] font-semibold">Ranked by priority</h2>
-            <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
-          </div>
-          <div className="flex flex-col overflow-y-auto">
-            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No requirements with evidence in {viewer.label}.</p>}
+          <div className="requirement-rows">
+            {reqs.length === 0 && <p className="empty-state">No requirements with evidence in {viewer.label}.</p>}
             {MOSCOW.map((m, gi) => {
               const next = MOSCOW[gi - 1]?.min ?? 101;
               const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
               if (!rows.length) return null;
               return (
-                <section key={m.key} aria-label={m.label} className="border-b border-line pb-2">
-                  <div className="flex items-baseline justify-between gap-2 px-3 pt-4 pb-1">
-                    <h3 className={`text-[12px] font-bold uppercase tracking-[0.1em] ${m.text}`}>{m.label}</h3>
-                    <span className="text-[12px] text-ink-3">{rows.length} · {m.hint}</span>
+                <section key={m.key} aria-label={m.label}>
+                  <div className="requirement-group">
+                    <h3 className={`font-semibold ${m.text}`}>{m.label}</h3>
+                    <span className="text-[10px] text-ink-3" title={m.hint}>{rows.length} requirements</span>
                   </div>
                   <ul>
                     {rows.map((r) => {
@@ -144,15 +127,18 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                           <Link
                             href={`/vehicles/${code}?${qFilter ? `q=${qFilter}&` : ""}req=${r.id}`}
                             aria-label={`${m.label}, priority ${r.priority}: ${r.title}`}
-                            className={`relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 py-2.5 pr-3 pl-7 ${on ? "bg-monitor-soft shadow-[inset_3px_0_0_var(--color-blue)]" : "hover:bg-mist"}`}
+                            className="requirement-row"
+                            aria-current={on ? "true" : undefined}
+                            scroll={false}
                           >
-                            <span className={`absolute left-3 top-[17px] h-[5px] w-[5px] ${m.dot}`} aria-hidden="true" />
-                            <span className="text-[15px] font-normal leading-snug text-ink">{r.title}</span>
-                            <span className="row-span-2 self-center text-[16px] font-semibold tabular-nums">{r.priority}</span>
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
-                              {r.aspect && <span>{r.aspect} · {r.part}</span>}
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="requirement-row-title">{r.title}</span>
+                              <span className="requirement-score" title={`Priority ${r.priority}`} aria-label={`Priority ${r.priority}`}>{r.priority}</span>
+                            </div>
+                            <span className="requirement-row-meta">
+                              <span className="font-mono">{r.id}</span>
                               <QuadrantBadge q={r.quadrant} />
-                              {r.status !== "proposed" && <StatusBadge s={r.status} />}
+                              <StatusBadge s={r.status} />
                             </span>
                           </Link>
                         </li>
@@ -164,7 +150,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             })}
           </div>
         </aside>
-        <div className="min-w-0">
+        <div className="requirement-detail" key={selectedId}>
+          <Link href={`/vehicles/${code}${qFilter ? `?q=${qFilter}` : ""}`} className="back-to-list" scroll={false}>← Back to requirements</Link>
           {detail ? (
             <DecisionCard
               r={detail.requirement}
@@ -177,7 +164,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               siblings={all}
             />
           ) : (
-            <p className="text-ink-3">Select a requirement.</p>
+            <div className="empty-state"><p className="font-medium text-ink-2">No requirement selected</p><p className="mt-2">Choose a requirement from the list to review its evidence and make a decision.</p></div>
           )}
         </div>
       </div>
