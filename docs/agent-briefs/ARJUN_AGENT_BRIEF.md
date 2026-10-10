@@ -163,3 +163,37 @@ Work on **one task at a time**. When a task is done: commit on your branch, push
 
 Open a PR with: what changed, the verified examples it reproduces (with comment IDs and price-list lines),
 any schema change called out in the title, and screenshots of Data health if it changed.
+
+## 8. Phase 2 (from 10 October, evening)
+
+Before starting: `git pull`, `cd pipeline && uv sync && uv run pmw build`, `cd web && npm install`.
+Requirement IDs are stable hashes now (e.g. `R-G70-73240d3417`). All web data access is async through `web/lib/gate.ts`.
+One task per branch and pull request; never merge your own pull request.
+
+Your Phase 1 work is merged (#1, #4). Phase 2, in priority order:
+
+### P2-1: Market conflict cards (signature feature #5)
+- Turn the strongest **in-scope** China vs. Europe gaps from `market_conflicts` into requirements with
+  `kind = 'market_conflict'`, e.g. 7 Series front roominess 7.69 vs 9.69, rear roominess 7.52 vs 9.41,
+  braking 7.82 vs 9.60. Value for money and overall satisfaction stay out of scope.
+- Each card states the gap, both market values and sales weights, and asks the product manager:
+  **global requirement or market-specific?** Evidence is survey-only (no China comments), so confidence must show it.
+- Give them a photo via `aspects.py`. Keep the 15 core requirements and quick wins unchanged.
+- **Done when:** the 7 Series shows 2 to 4 conflict cards with correct numbers, regions see them correctly, all tests pass.
+
+### P2-2: Happiness Meter data (unblocks Gokul)
+- Add `happiness(viewer, vehicle)` to `web/lib/gate.ts` (async). Per market: negative comments in in-scope signals,
+  how many are covered by **approved** requirements, the share, and the 2025 sales weight.
+  Markets without comments return `null` ("unknown"), never 0 or 100.
+- It must be computed live, because approvals change at runtime. Add a test.
+
+### P2-3: Survey coverage and text scope
+- Every core theme maps to at least one survey attribute where one plausibly exists; list the ones that cannot.
+- Apply text-based scope rules to comment text (pricing, regulatory) with readable reasons.
+
+### P2-4: Photos
+- Every quick win and conflict card gets a fitting photo and focal point; none falls back to "Whole vehicle".
+
+### P2-5: Pitch input
+- `docs/pitch/data-traps.md`: one slide "Traps we found in BMW's data" (broken sales formula, split comments,
+  unlabelled comments, no China comments, Germany-only price lists, empty survey questions) and how each was handled.

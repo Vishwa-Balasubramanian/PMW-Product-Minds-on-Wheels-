@@ -1,15 +1,19 @@
 @import "tailwindcss";
 
-/* Albert Sans, self-hosted (no requests to Google from visitors' browsers). SIL Open Font License. */
-@font-face { font-family: "Albert Sans"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/albert-sans-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Albert Sans"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/albert-sans-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Typography. "BMW Type Next" is used where it is installed on the viewer's machine (local only).
+   Licensed BMW Type Next files are not in public/fonts, so no file-based @font-face is declared for it;
+   when the files are added, add url() sources to the rule below. Fallback: Inter, self-hosted
+   (no requests to Google from visitors' browsers). Inter: SIL Open Font License. */
+@font-face { font-family: "BMW Type Next"; font-weight: 300 700; font-display: swap; src: local("BMW Type Next"), local("BMWTypeNext"), local("BMW Type Next Latin"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/inter-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/inter-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 /* Shared workspace tokens: compact controls, readable type and restrained status colors. */
 @theme {
-  --font-sans: "Albert Sans", Arial, Helvetica, sans-serif;
+  --font-sans: "BMW Type Next", "Inter", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-  --color-blue: #245fc7;
-  --color-blue-dark: #194ba6;
+  --color-blue: #1c69d4;
+  --color-blue-dark: #0653b6;
   --color-ink: #202b3c;
   --color-ink-2: #526075;
   --color-ink-3: #69768a;
@@ -28,6 +32,8 @@
   --color-should: #a26717;
   --color-could: #245fc7;
   --color-wont: #69768a;
+  --color-challenge: #925b0c;
+  --color-challenge-soft: #fff4de;
   --color-danger: #b6333d;
   --color-danger-soft: #fcecef;
 }
@@ -62,7 +68,7 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
 /* The shell owns the viewport; individual work areas own their scroll position. */
 .workspace-sidebar { position: fixed; inset: 0 auto 0 0; width: 224px; background: #f9fafc; border-right: 1px solid var(--color-line); display: flex; flex-direction: column; z-index: 40; }
 .workspace-brand { display: flex; align-items: center; gap: 11px; height: 80px; padding: 0 22px; flex-shrink: 0; }
-.brand-symbol { display: grid; place-items: center; display: inline-block; font-size: 33px; font-weight: 700; letter-spacing: -3px; line-height: 1; }
+.brand-symbol { display: block; font-size: 25px; font-weight: 700; letter-spacing: -.04em; line-height: 1; }
 .workspace-nav { padding: 16px 12px; }
 .nav-label { margin-bottom: 8px; padding-inline: 12px; color: var(--color-ink-3); font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
 .nav-item { display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 8px 12px; border-radius: 6px; color: var(--color-ink-2); font-size: 13px; margin-bottom: 3px; }
@@ -133,7 +139,7 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
 .decision-thumbnail { width: 64px; height: 56px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 .decision-actions { position: sticky; top: 0; z-index: 10; background: #fff; border-block: 1px solid var(--color-line); padding: 10px 24px; }
 .decision-actions:has(form) { position: relative; }
-.challenge-result { margin: 16px 24px; padding: 16px; border: 1px solid #c8d9f8; border-radius: 8px; background: var(--color-monitor-soft); }
+.challenge-result { margin: 16px 24px; padding: 16px; border: 1px solid #e8ce98; border-radius: 8px; background: var(--color-challenge-soft); }
 .review-tablist { display: flex; border-bottom: 1px solid var(--color-line); padding-inline: 24px; gap: 22px; }
 .review-tablist button { padding: 12px 0; border-bottom: 2px solid transparent; font-size: 12px; font-weight: 500; color: var(--color-ink-3); }
 .review-tablist button[aria-selected=true] { color: var(--color-blue); border-color: var(--color-blue); }
@@ -196,3 +202,13 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
   .back-to-list { margin-left: 16px; }
   .decision-thumbnail { width: 48px; height: 48px; }
 }
+
+.vehicle-titlebar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.export-menu { position: relative; flex-shrink: 0; }
+.export-menu summary { list-style: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu summary::after { content: "\2304"; margin-left: 8px; }
+.export-options { position: absolute; z-index: 30; right: 0; top: calc(100% + 6px); width: 170px; padding: 6px; background: white; border: 1px solid var(--color-line); border-radius: 8px; box-shadow: 0 8px 24px #14203314; }
+.export-options a { display: block; padding: 9px; border-radius: 4px; font-size: 12px; color: var(--color-ink-2); }
+.export-options a:hover { background: var(--color-monitor-soft); color: var(--color-blue); }
+@media (max-width: 639px) { .vehicle-titlebar { align-items: flex-start; } .vehicle-titlebar .vehicle-heading img { display: none; } }

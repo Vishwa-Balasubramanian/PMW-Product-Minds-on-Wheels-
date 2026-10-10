@@ -54,23 +54,38 @@ Customer voice → Signal → Root cause → Customer need → Requirement → P
 
 ## 5. Status
 
-**Done**
-- Pipeline: ingest with recorded data issues, signals, scope guard, survey cross-checks, missing voices, market
-  conflicts, template requirements, deterministic priority and confidence, challenge issues, photo per requirement.
-- Web app: home, region picker, MoSCoW requirement list, Decision Card with photo header and the 5-step ladder,
-  approve / validate first / edit / reject / challenge, decision matrix, signals, data health, audit trail.
-- Hosted at https://product-minds-on-wheels.vercel.app with a shared database, so decisions persist.
-- Agent briefs for Vishwa and Arjun in the repo.
+**Done (merged into `main`)**
+- #1, #4 (Arjun): "You already sell this" finder. Positioned price-list parser with six verified checks; matches only
+  from customer wishes, on the right topic; up to five feature-specific quick wins per vehicle.
+- #2 (Vishwa): complete evidence-to-decision workflow. Reviewed evidence templates for root cause, customer need and
+  requirement (labelled "needs validation"), rule-based labels for unlabelled comments, merged themes, stable
+  requirement IDs, calibrated scoring, challenge narrative and priority sensitivity, 36+ Python and 15 browser tests.
+- #3 (Gokul): requirement export in BMW's format (CSV / JSON), region-filtered and logged.
+- #5, #6 (Gokul): scroll position kept when opening a requirement; BMW Group internal-tool branding
+  (header lockup, palette, typography, favicon). The BMW logo file still has to be added.
+- Hosted at https://product-minds-on-wheels.vercel.app (Turso database, not indexed, no trackers).
 
-**In progress**
-- Arjun: "You already sell this" finder (pull request #1 open).
-- Vishwa: AI-written root cause, customer need and requirement text (templates show "Pending AI analysis" today).
+**Open decisions**
+- Name in the docs: the app now says "Product Manager's Workbench"; this file, README and the briefs say
+  "Product Minds on Wheels".
+- BMW logo: add `web/public/brand/bmw-logo.svg` and confirm the organizers allow it on a public prototype.
 
-**Open**
-- Gokul: priority weight sliders and strategy presets, requirement export in BMW's format, workflow page,
-  "You already sell this" banner, challenge narrative display, Happiness Meter UI, pitch deck.
-- Arjun: equipment parser, market conflict cards, Happiness Meter data, survey coverage, photos, web sources.
-- Vishwa: label the ~1,180 unlabelled comments, scoring calibration, challenge narrative, theme merging.
+## 5a. Phase 2 split
+
+Each person owns different files. Shared files (`gate.ts`, `types.ts`, `db.py`) only get additions; schema changes are
+flagged in the PR title. `DecisionCard.tsx` and `Header.tsx` belong to Gokul: Vishwa and Arjun build separate
+components and Gokul places them. Details and "done when" checks are in each person's brief.
+
+| | Gokul (frontend, demo lead) | Vishwa (AI and scoring) | Arjun (data and evidence) |
+|---|---|---|---|
+| 1 | **Workflow page** `/workflow` (BMW deliverable 3) | **Evidence vs. assumption meter** (wow #4) | **Market conflict cards** (wow #5) |
+| 2 | "You already sell this" banner + Quick wins filter | **Portfolio page** `/portfolio` (topics × 1/5/7 Series) | **Happiness Meter data** `happiness()` in `gate.ts` |
+| 3 | Priority sliders + strategy presets | Real AI run, if an API key is available | Survey coverage + text scope rules |
+| 4 | Happiness Meter UI (after Arjun 2) | Pitch: "How scoring works" + judge Q&A | Photos for quick wins and conflict cards |
+| 5 | Pitch lead: deck, demo script, backup video | | Pitch: "Traps we found in BMW's data" |
+
+Merge order: Arjun 2 early (unblocks the meter UI); Vishwa 1 before Gokul polishes the Decision Card.
+Feature freeze two hours before the deadline, then rehearse at least five times.
 
 ## 6. Demo story (5 minutes, 7 Series)
 

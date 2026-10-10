@@ -73,7 +73,6 @@ CREATE TABLE IF NOT EXISTS equipment (
   price_eur REAL,
   availability TEXT NOT NULL,      -- standard | optional | package_item | unknown
   package TEXT,                    -- package name when availability = package_item
-  trim TEXT,
   raw TEXT
 );
 
@@ -81,6 +80,7 @@ CREATE TABLE IF NOT EXISTS equipment (
 CREATE TABLE IF NOT EXISTS equipment_matches (
   vehicle TEXT NOT NULL,
   signal_or_requirement_id TEXT NOT NULL,
+  feature TEXT NOT NULL,
   match_type TEXT NOT NULL,         -- option_same_vehicle | package_same_vehicle | standard_other_vehicle | standard_but_failing
   equipment_name TEXT NOT NULL,
   code TEXT,

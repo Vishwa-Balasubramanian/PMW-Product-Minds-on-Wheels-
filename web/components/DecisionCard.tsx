@@ -86,7 +86,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
 
       {r.challenged && (
         <section className="challenge-result">
-          <h3 className="eyebrow text-blue">Challenge result</h3>
+          <h3 className="eyebrow text-challenge">Challenge result</h3>
           {r.challenge.narrative && <p className="mt-2 text-[13px] text-ink-2">{r.challenge.narrative}</p>}
           <p className="mt-2 text-[13px]">
             The red-team check found {r.challenge.issues.length} issue{r.challenge.issues.length === 1 ? "" : "s"}.

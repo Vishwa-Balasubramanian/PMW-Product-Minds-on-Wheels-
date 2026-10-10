@@ -69,7 +69,7 @@ export function DecisionActions({ r }: { r: Requirement }) {
           </>
         )}
         <button
-          className="btn btn-sm border border-blue text-blue hover:bg-blue hover:text-white"
+          className="btn btn-sm border border-challenge text-challenge hover:bg-challenge hover:text-white"
           onClick={() => setMode("challenge")}
           disabled={pending || r.challenged}
           title={r.challenged ? "Already challenged" : "Ask the AI what could make this wrong"}

@@ -128,7 +128,14 @@ export type RequirementView = {
 export async function getRequirement(viewer: Viewer, id: string): Promise<RequirementView | undefined> {
   const req = await getRequirementRow(id);
   if (!req || !req.markets.some((m) => viewer.markets.includes(m as Market))) return undefined;
-  const allQuotes = await all<Quote>(
+  const feedbackIds = [...new Set(req.already_exists.flatMap((match) => match.feedback_ids))];
+  const allQuotes = req.kind === "quick_win" ? (
+    feedbackIds.length ? await all<Quote>(
+      `SELECT id, text, source, market, country, powertrain, severity, 'supports' AS role
+       FROM feedback WHERE vehicle = ? AND id IN ${inList(feedbackIds)} ORDER BY id`,
+      [req.vehicle, ...feedbackIds],
+    ) : []
+  ) : await all<Quote>(
     `SELECT f.id, f.text, f.source, f.market, f.country, f.powertrain, f.severity, e.role
      FROM signal_evidence e JOIN feedback f ON f.id = e.feedback_id WHERE e.signal_id = ?`,
     [req.signal_id],
@@ -160,6 +167,70 @@ async function logAccess(viewer: Viewer, id: string, restricted: boolean) {
       entity_type: "requirement",
       entity_id: id,
       action: restricted ? "viewed evidence (other markets restricted)" : "viewed evidence",
+    }),
+  ]);
+}
+
+// ---------- export ----------
+
+export type ExportBundle = {
+  requirements: Requirement[];
+  /** Supporting comment IDs per signal: the ones the viewer may see, and counts per hidden market. */
+  evidence: Map<string, { visible: string[]; hidden: Record<string, number> }>;
+  /** Most recent product-manager decision per requirement. */
+  lastDecision: Map<string, AuditEvent>;
+};
+
+/** Everything the requirement export needs, filtered by the viewer's region. */
+export async function exportBundle(viewer: Viewer, vehicle: string): Promise<ExportBundle> {
+  // listRequirements already applies restrictRawEvidence (no raw quotes outside the viewer's market).
+  const requirements = await listRequirements(viewer, vehicle);
+  const evidence: ExportBundle["evidence"] = new Map();
+  const lastDecision: ExportBundle["lastDecision"] = new Map();
+  if (!requirements.length) return { requirements, evidence, lastDecision };
+
+  const signalIds = [...new Set(requirements.map((r) => r.signal_id))];
+  const rows = await all<{ signal_id: string; id: string; market: string; text: string }>(
+    `SELECT e.signal_id, f.id, f.market, f.text FROM signal_evidence e JOIN feedback f ON f.id = e.feedback_id
+     WHERE e.role = 'supports' AND e.signal_id IN ${inList(signalIds)} ORDER BY e.rowid`,
+    signalIds,
+  );
+  const firstVisible = new Map<string, { id: string; text: string }>();
+  for (const r of rows) {
+    const e = evidence.get(r.signal_id) ?? { visible: [], hidden: {} };
+    if (viewer.markets.includes(r.market as Market)) {
+      e.visible.push(r.id);
+      if (!firstVisible.has(r.signal_id)) firstVisible.set(r.signal_id, { id: r.id, text: r.text });
+    } else e.hidden[r.market] = (e.hidden[r.market] ?? 0) + 1;
+    evidence.set(r.signal_id, e);
+  }
+  // Same rule as getRequirement: the customer voice is the first supporting quote the viewer may see.
+  if (viewer.region !== "ALL") {
+    for (const r of requirements) {
+      const q = firstVisible.get(r.signal_id);
+      r.customer_voice = q ? `“${q.text.slice(0, 260)}” (${q.id})` : null;
+    }
+  }
+
+  const reqIds = requirements.map((r) => r.id);
+  const decisions = await all<AuditEvent>(
+    `SELECT * FROM audit_events WHERE actor_type = 'pm' AND entity_type = 'requirement' AND entity_id IN ${inList(reqIds)} ORDER BY id`,
+    reqIds,
+  );
+  for (const d of decisions) lastDecision.set(d.entity_id!, d);
+  return { requirements, evidence, lastDecision };
+}
+
+export async function logExport(viewer: Viewer, vehicle: string, format: string, count: number) {
+  await writeBatch([
+    auditStatement({
+      actor_type: "pm",
+      actor: viewer.actor,
+      region: viewer.region,
+      entity_type: "dataset",
+      entity_id: vehicle,
+      action: "exported requirement list",
+      after: `${count} requirements as ${format.toUpperCase()}`,
     }),
   ]);
 }
@@ -238,7 +309,7 @@ export async function dataIssues(vehicle?: string) {
 
 export async function listSignals(vehicle: string): Promise<Signal[]> {
   const rows = await all(
-    `SELECT s.*, r.id AS requirement_id FROM signals s LEFT JOIN requirements r ON r.signal_id = s.id
+    `SELECT s.*, r.id AS requirement_id FROM signals s LEFT JOIN requirements r ON r.signal_id = s.id AND r.kind = 'signal'
      WHERE s.vehicle = ? ORDER BY s.n_negative DESC`,
     [vehicle],
   );

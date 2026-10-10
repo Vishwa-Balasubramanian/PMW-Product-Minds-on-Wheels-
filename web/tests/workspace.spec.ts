@@ -131,3 +131,25 @@ test('all small-screen views and review tabs stay within the workspace', async (
     expect(await detail.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   }
 });
+
+test('workspace exports remain available on mobile and respect the selected region', async ({ page, context }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await context.addCookies([{ name: 'pmw_region', value: 'CN', url: 'http://127.0.0.1:3107' }]);
+  await page.goto('/vehicles/G70');
+  await page.locator('.export-menu summary').click();
+  await expect(page.getByRole('link', { name: 'Export CSV', exact: true })).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Export CSV', exact: true }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^pmw-requirements-G70-CN-.*\.csv$/);
+  expect(await download.failure()).toBeNull();
+  await expect(page.getByRole('link', { name: 'Export JSON', exact: true })).toBeVisible();
+  const response = await page.request.get('/api/export?vehicle=G70&format=json');
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+  expect(data.region).toBe('China');
+  expect(data.count).toBeGreaterThan(0);
+  expect(data.requirements.every((r: { customer_voice: string; comment_ids: string[] }) => !r.customer_voice && r.comment_ids.length === 0)).toBeTruthy();
+  await expectNoOverflow(page);
+});

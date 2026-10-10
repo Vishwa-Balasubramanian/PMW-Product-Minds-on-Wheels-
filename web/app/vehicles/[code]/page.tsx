@@ -39,10 +39,19 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   return (
     <div className="vehicle-workspace">
       <section className="vehicle-summary">
+        <div className="vehicle-titlebar">
         <div className="vehicle-heading">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/cars/${code}-wide.jpg`} alt="" />
           <div><h1 className="page-heading">{vehicle.name}</h1><p className="page-caption">{code} · Requirements for the successor generation</p></div>
+        </div>
+        <details className="export-menu">
+          <summary className="btn-outline btn-sm">Export</summary>
+          <div className="export-options" aria-label="Export requirement list">
+            <a href={`/api/export?vehicle=${code}&format=csv`} download>Export CSV</a>
+            <a href={`/api/export?vehicle=${code}&format=json`} download>Export JSON</a>
+          </div>
+        </details>
         </div>
         <dl className="vehicle-metrics">
           <div><dd>{all.length}</dd><dt>requirements in your region</dt></div>

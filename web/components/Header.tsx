@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useRef } from "react";
 import type { Viewer } from "@/lib/gate";
 import { RegionPicker } from "./RegionPicker";
+import { BrandLogo } from "./BrandLogo";
 
 const VEHICLES = [
   { code: "G70", label: "7 Series" },
@@ -33,8 +34,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
     return (
       <>
         <Link href="/" className="workspace-brand" onClick={() => drawer.current?.close()} aria-label="PMW portfolio">
-          <span className="brand-symbol">p<span className="text-blue">.</span></span>
-          <span><b className="block text-[15px] tracking-tight">Product Minds</b><span className="text-[11px] text-ink-3">on Wheels</span></span>
+          <span><span className="brand-symbol"><span className="text-blue">P</span>MW</span><span className="mt-1 block text-[10px] text-ink-3">Product Manager&apos;s Workbench</span></span>
         </Link>
         {mobile && <button className="drawer-close" onClick={() => drawer.current?.close()} aria-label="Close navigation">×</button>}
         <nav aria-label={mobile ? "Mobile navigation" : "Main"} className="workspace-nav">
@@ -49,7 +49,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
           <p className="nav-label mt-7">Governance</p>
           <Link href="/audit" className="nav-item" aria-current={pathname === "/audit" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="audit" />Audit trail</Link>
         </nav>
-        <div className="sidebar-footer"><span className="mb-2 block font-medium text-ink-2">Evidence → decisions</span>Product Minds on Wheels<br />BMW challenge workspace</div>
+        <div className="sidebar-footer"><BrandLogo /><span className="mb-2 block font-medium text-ink-2">Evidence → decisions</span>for BMW Group<br />Hackathon prototype</div>
       </>
     );
   }

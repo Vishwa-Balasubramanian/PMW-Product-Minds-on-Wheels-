@@ -145,3 +145,36 @@ Work on **one task at a time**. When a task is done: commit on your branch, push
 
 Open a PR with: what changed, before/after for two G70 requirements (title, root cause, requirement),
 the new quadrant split, and any schema change called out in the title.
+
+## 8. Phase 2 (from 10 October, evening)
+
+Before starting: `git pull`, `cd pipeline && uv sync && uv run pmw build`, `cd web && npm install`.
+Requirement IDs are stable hashes now (e.g. `R-G70-73240d3417`). All web data access is async through `web/lib/gate.ts`.
+One task per branch and pull request; never merge your own pull request.
+
+Your Phase 1 work is merged (#2). Phase 2, in priority order:
+
+### P2-1: Evidence vs. assumption meter (signature feature #4)
+- For every requirement, compute how much of it rests on **observed customer comments**, **survey data**,
+  **AI inference** (root cause hypotheses, merged themes) and **forward-looking assumptions** (2030).
+- Compute it in the pipeline (`score.py` or a new module), deterministically, with the rule documented next to the code.
+  Store it as a new JSON field, e.g. `requirements.evidence_mix` = `{observed, survey, inferred, assumed}` summing to 1.
+  This is a schema change: `db.py` + `types.ts`, flagged in the PR title.
+- Build `web/components/EvidenceMeter.tsx` (a stacked bar with a legend, BMW palette, readable at 375px).
+  Gokul places it on the Decision Card; do not edit `DecisionCard.tsx` yourself.
+- **Done when:** every requirement has a mix, the rule is explained in one paragraph a judge can follow, and the
+  component renders correctly for a comment-heavy and a survey-only (China) requirement.
+
+### P2-2: Portfolio page `/portfolio`
+- A heatmap of themes × 1 Series / 5 Series / 7 Series (negative share per theme from `signals`), showing issues that
+  repeat across the range (e.g. connectivity, ease of use). Region rules apply: summary numbers only, no raw comments.
+- New page plus an async `portfolio()` function in `gate.ts`. Ask Gokul to add the header link (his file).
+- **Done when:** the page renders for every region, works at 375px, and each cell links to the vehicle's signals view.
+
+### P2-3: Real AI run (only if an API key is available)
+- Run the validated AI path you built, commit the cache, and show before/after for two 7 Series requirements.
+  Skip if no key; the reviewed templates stay.
+
+### P2-4: Pitch input
+- `docs/pitch/scoring.md`: one slide "How scoring works" (priority vs. confidence, the factors, why the model never
+  writes numbers) and answers to the five questions judges are most likely to ask about the formulas.
