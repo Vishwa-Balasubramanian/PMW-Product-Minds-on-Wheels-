@@ -20,7 +20,15 @@ export type SurveyRow = {
 
 export type Conflict = { vehicle: string; attribute: string; cn: number; eu: number; delta: number };
 
-export type Challenge = { issues: { penalty: number; text: string }[]; revised_confidence: number };
+export type Challenge = {
+  issues: { penalty: number; text: string }[];
+  revised_confidence: number;
+  narrative?: string;
+  narrative_source?: string;
+  priority_sensitivity?: { min: number; max: number; crosses_threshold: boolean };
+};
+
+export type LabelSource = "bmw" | "ai" | "rule";
 
 export type Requirement = {
   id: string;

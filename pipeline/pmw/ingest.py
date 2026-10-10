@@ -5,6 +5,7 @@ Owner: Arjun (data and evidence). Equipment parsing is best-effort and the obvio
 from __future__ import annotations
 
 import re
+import logging
 import shutil
 import subprocess
 from collections import defaultdict
@@ -50,8 +51,10 @@ def ingest_vehicles(con) -> None:
 
 def ingest_feedback(con, code: str) -> dict:
     path = RAW / VEHICLES[code]["feedback_file"]
-    ws = openpyxl.load_workbook(path, read_only=True).worksheets[0]
+    wb = openpyxl.load_workbook(path, read_only=True)
+    ws = wb.worksheets[0]
     rows = list(ws.iter_rows(values_only=True))
+    wb.close()
     header, rows = rows[0], rows[1:]
     idx = {h: i for i, h in enumerate(header)}
 
@@ -103,7 +106,7 @@ def ingest_feedback(con, code: str) -> dict:
     if n_rows != n_comments:
         db.issue(con, "feedback", "warning",
                  f"{n_rows:,} rows but {n_comments:,} comments: one comment is split across several rows, one per label.",
-                 "Stored one row per comment plus a separate labels table, so counts are per customer, not per row.", code)
+                 "Stored one row per comment plus a separate labels table; comment IDs do not establish unique customers.", code)
     if unclassified:
         db.issue(con, "feedback", "warning",
                  f"{unclassified:,} comments ({unclassified / n_comments:.0%}) have no topic label.",
@@ -183,6 +186,7 @@ def ingest_studies(con) -> None:
                  "Skipped. Requirements that would rely on them get no survey support.")
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id="customer_studies",
              action="ingested customer studies", after="CN_EU_2025 means, US_2025 distributions")
+    wb.close()
 
 
 def ingest_sales(con) -> None:
@@ -209,6 +213,7 @@ def ingest_sales(con) -> None:
                 con.execute("INSERT INTO sales (vehicle, market, year, volume) VALUES (?,?,?,?)", (code, mk, year, val))
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id="sales",
              action="ingested sales volumes", after="2024, 2025, 2030 forecast by market")
+    wb.close()
 
 
 PRICE_RE = re.compile(r"^(?P<name>\S.*?)\s{2,}(?P<code>[0-9][0-9A-Z]{2}|[A-Z0-9]{3})\s+(?P<price>[\d.]+,[–-]|–,–)")
@@ -218,11 +223,29 @@ PKG_RE = re.compile(r"^(?P<name>[A-ZÄÖÜ][A-ZÄÖÜ &\-]+PAKET[A-ZÄÖÜ ]*)\s
 def ingest_equipment(con, code: str) -> None:
     """Best-effort parse of the German price list. Next step: proper package contents and per-trim columns."""
     pdf = RAW / VEHICLES[code]["options_file"]
-    if not shutil.which("pdftotext"):
-        db.issue(con, "equipment", "warning", "pdftotext not installed, equipment list skipped.",
-                 "Install poppler (brew install poppler) and rebuild.", code)
-        return
-    text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True).stdout
+    if shutil.which("pdftotext"):
+        text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True,
+                              text=True, encoding="utf-8", check=True).stdout
+    else:
+        # Cross-platform fallback: Windows builds also consume all supplied PDFs.
+        from pypdf import PdfReader
+        logger = logging.getLogger('pypdf._text_extraction._layout_mode._fixed_width_page')
+        rotated = []
+        def collect_rotation_warning(record):
+            if record.getMessage().startswith('Rotated text discovered'):
+                rotated.append(record.getMessage())
+                return False
+            return True
+        logger.addFilter(collect_rotation_warning)
+        reader = PdfReader(pdf)
+        try:
+            text = '\n'.join(p.extract_text(extraction_mode='layout') or '' for p in reader.pages)
+        finally:
+            reader.close()
+            logger.removeFilter(collect_rotation_warning)
+        if rotated:
+            db.issue(con, 'equipment', 'warning', 'PDF tables contain rotated headings that layout extraction may omit.',
+                     'Equipment entries are provisional; verify per-trim availability against the source PDF.', code)
     package = None
     n = 0
     for line in text.splitlines():

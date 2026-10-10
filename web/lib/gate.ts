@@ -93,9 +93,18 @@ function toRequirement(r: Row): Requirement {
 }
 
 /** Requirements with evidence in at least one of the viewer's markets. */
+function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
+  if (viewer.region === "ALL") return r;
+  // Lists are also serialized into client component props. Raw quotes must not
+  // survive there just because the visible quote list is region-filtered.
+  return { ...r, customer_voice: null,
+    contradictions: r.contradictions.map((text) => text.split(" For example ")[0]) };
+}
+
 export function listRequirements(viewer: Viewer, vehicle: string): Requirement[] {
   const rows = db().prepare("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC").all(vehicle) as Row[];
-  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)));
+  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
+    .map((r) => restrictRawEvidence(viewer, r));
 }
 
 export function getRequirementRow(id: string): Requirement | undefined {
@@ -112,7 +121,7 @@ export type RequirementView = {
 /** One requirement with the customer evidence the viewer may see. Logs the access. */
 export function getRequirement(viewer: Viewer, id: string): RequirementView | undefined {
   const req = getRequirementRow(id);
-  if (!req) return undefined;
+  if (!req || !req.markets.some((m) => viewer.markets.includes(m as Market))) return undefined;
   const all = db()
     .prepare(
       `SELECT f.id, f.text, f.source, f.market, f.country, f.powertrain, f.severity, e.role
@@ -123,7 +132,12 @@ export function getRequirement(viewer: Viewer, id: string): RequirementView | un
   const hidden: Record<string, number> = {};
   for (const q of all) if (!viewer.markets.includes(q.market as Market)) hidden[q.market] = (hidden[q.market] ?? 0) + 1;
   logAccess(viewer, id, Object.keys(hidden).length > 0);
-  return { requirement: req, quotes, hidden };
+  const requirement = restrictRawEvidence(viewer, req);
+  if (viewer.region !== "ALL") {
+    const voice = quotes.find((q) => q.role === "supports");
+    requirement.customer_voice = voice ? `“${voice.text.slice(0, 260)}” (${voice.id})` : null;
+  }
+  return { requirement, quotes, hidden };
 }
 
 function logAccess(viewer: Viewer, id: string, restricted: boolean) {
@@ -234,7 +248,7 @@ export function vehicleTotals(vehicle: string) {
   const one = (sql: string, ...a: unknown[]) => (d.prepare(sql).get(...a) as { n: number }).n;
   return {
     comments: one("SELECT COUNT(*) n FROM feedback WHERE vehicle = ?", vehicle),
-    unlabelled: one("SELECT COUNT(*) n FROM feedback WHERE vehicle = ? AND classified = 0", vehicle),
+    unlabelled: one("SELECT COUNT(*) n FROM feedback f WHERE vehicle = ? AND NOT EXISTS (SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL)", vehicle),
     signals: one("SELECT COUNT(*) n FROM signals WHERE vehicle = ?", vehicle),
     outOfScope: one("SELECT COUNT(*) n FROM signals WHERE vehicle = ? AND in_scope = 0", vehicle),
   };

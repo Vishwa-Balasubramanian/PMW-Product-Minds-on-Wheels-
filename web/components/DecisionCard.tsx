@@ -4,7 +4,7 @@ import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, 
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
-const PENDING = "Pending AI analysis. Run the pipeline with --llm to fill this step.";
+const PENDING = "Further evidence is needed before this step can be completed.";
 
 function Ladder({ r }: { r: Requirement }) {
   const steps = [
@@ -22,7 +22,7 @@ function Ladder({ r }: { r: Requirement }) {
           <span className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-semibold tabular-nums ${i === steps.length - 1 ? "bg-blue text-white" : "border border-ink-3 text-ink-2"}`}>{i + 1}</span>
           <div>
             <div className="eyebrow">{s.k}</div>
-            <p className={`mt-1 text-[15px] ${s.v ? (i === steps.length - 1 ? "font-normal text-ink" : "text-ink-2") : "italic text-ink-3"}`}>{s.v ?? PENDING}</p>
+            <p className={`mt-1 text-[15px] ${s.v ? (i === steps.length - 1 ? "font-normal text-ink" : "text-ink-2") : "italic text-ink-3"}`}>{s.v ?? (s.k === "Customer voice" ? "No supporting customer quote is available in your selected region." : PENDING)}</p>
           </div>
         </li>
       ))}
@@ -93,7 +93,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
           <span className="font-mono text-ink-2">{r.id}</span>
           <span className="font-semibold text-ink">Rank {siblings.findIndex((x) => x.id === r.id) + 1} of {siblings.length} · priority {r.priority}</span>
-          <span>· {r.generated_by === "template" ? "Template draft" : `Drafted by ${r.generated_by.replace("llm:", "")}`}</span>
+          <span>· {r.generated_by.startsWith("evidence-template") ? "Evidence-based draft · needs validation" : r.generated_by === "template" ? "Template draft" : "AI draft · needs validation"}</span>
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
         <DecisionActions r={r} />
@@ -102,6 +102,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
       {r.challenged && (
         <section className="border border-blue bg-monitor-soft p-6">
           <h3 className="eyebrow text-blue">Challenge result</h3>
+          {r.challenge.narrative && <p className="mt-2 text-[15px] text-ink-2">{r.challenge.narrative}</p>}
           <p className="mt-2 text-[15px]">
             The red-team check found {r.challenge.issues.length} issue{r.challenge.issues.length === 1 ? "" : "s"}.
             Confidence moved from <b className="tabular-nums">{originalConfidence ?? "?"}</b> to <b className="tabular-nums">{r.confidence}</b>,
@@ -110,6 +111,12 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           <ul className="mt-3 flex list-disc flex-col gap-1 pl-5 text-[14px] text-ink-2">
             {r.challenge.issues.map((i) => <li key={i.text}>{i.text} <span className="text-ink-3">(−{i.penalty})</span></li>)}
           </ul>
+          {r.challenge.priority_sensitivity && (
+            <p className="mt-3 text-[13px] text-ink-3">
+              Priority ranges from {r.challenge.priority_sensitivity.min} to {r.challenge.priority_sensitivity.max} when each strategy weight changes by 20% in turn.
+              {r.challenge.priority_sensitivity.crosses_threshold ? " Review this borderline priority with your team." : " The priority threshold remains on the same side in these scenarios."}
+            </p>
+          )}
         </section>
       )}
 

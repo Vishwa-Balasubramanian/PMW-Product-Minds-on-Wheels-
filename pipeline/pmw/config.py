@@ -5,6 +5,12 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# Environment variables win over local files; no key is ever included in a cache.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / "pipeline" / ".env", override=False)
+except ImportError:
+    pass
 # The BMW files live in data/ in the repo. data/raw/ (git-ignored) still works for local copies.
 RAW = next((p for p in (ROOT / "data" / "raw", ROOT / "data") if (p / "sales_volumes.xlsx").exists()), ROOT / "data")
 DB_PATH = Path(os.environ.get("PMW_DB", ROOT / "db" / "pmw.sqlite"))
@@ -12,6 +18,7 @@ CACHE = ROOT / "pipeline" / "cache"
 
 # Default model for AI steps (override with PMW_MODEL).
 MODEL = os.environ.get("PMW_MODEL", "claude-opus-5-5")
+MODEL_FAST = os.environ.get("PMW_MODEL_FAST") or MODEL
 
 VEHICLES: dict[str, dict] = {
     "F70": {

@@ -9,18 +9,20 @@ Customer voice → Signal → Root cause → Customer need → Requirement → P
 
 ## Run it (10 minutes)
 
-Needs: Node 20+, [uv](https://docs.astral.sh/uv/), poppler (`brew install poppler`, for the price-list PDFs).
+Needs: Node 22+, current npm, and [uv](https://docs.astral.sh/uv/). Poppler is optional;
+the pipeline includes a PDF reader fallback for Windows and other environments.
 
 ```bash
 # 2. Build the database (about 2 seconds)
 cd pipeline
 uv sync
-uv run pmw build            # template mode, no API key needed
+uv run pmw build --offline  # complete evidence drafts; no network generation
+uv run pmw verify          # citations, counts and deterministic scoring checks
 # uv sync --extra llm && ANTHROPIC_API_KEY=... uv run pmw build --llm   # AI mode, see below
 
 # 3. Run the web app
 cd ../web
-npm install
+npm ci --ignore-scripts     # uses the shipped SQLite binary without a local C++ build
 npm run dev                 # http://localhost:3000
 ```
 
@@ -64,9 +66,14 @@ In production this maps onto BMW single sign-on and database-level security.
 
 ## AI mode
 
-`uv run pmw build --llm` asks the LLM to write the root cause, customer need, requirement, assumptions and
-uncertainties for each signal. Results are cached in `pipeline/cache/` and **committed**, so only one person needs
-an API key and everyone else gets the same drafts. Model: set `PMW_MODEL` (see `pipeline/.env.example`).
+`uv run pmw build --llm` classifies unlabelled feedback, drafts requirements and explains challenges.
+Validated results are cached by their full inputs in `pipeline/cache/`; commit those files after a live run
+so teammates can replay them without a key. Model: set `PMW_MODEL` (and optionally `PMW_MODEL_FAST`) in
+`pipeline/.env`. `--offline` reads validated caches but prohibits network calls even if a key exists.
+Without a matching cache, the pipeline uses explicit evidence-based templates and provisional rule labels.
+Live-model caches are not included in the offline-first deliverable.
+
+Implementation, checks and limitations: [Vishwa pipeline handoff](docs/VISHWA_IMPLEMENTATION.md).
 
 ## Repo map
 

@@ -6,6 +6,7 @@ Owner: Arjun. Next: extend TOPIC_TO_SURVEY, match equipment (Trickle-Down Finder
 from __future__ import annotations
 
 from .config import MARKETS
+from .themes import member_topics
 
 # BMW topic (taxonomy level 2) -> survey attributes. Prefix match, case-insensitive.
 # "us" = US_2025 questions, "cneu" = CN_EU_2025 attributes.
@@ -68,6 +69,14 @@ def survey_gap(row) -> float:
 
 
 def survey_for_topic(con, vehicle: str, topic: str) -> list[dict]:
+    members = member_topics(topic)
+    if members != (topic,):
+        # Union every member's mappings; overlapping survey questions count once.
+        unique = {}
+        for member in members:
+            for row in survey_for_topic(con, vehicle, member):
+                unique[(row['market'], row['study'], row['attribute'], row['variant'])] = row
+        return [unique[key] for key in sorted(unique, key=str)]
     m = TOPIC_TO_SURVEY.get(topic)
     if not m:
         return []

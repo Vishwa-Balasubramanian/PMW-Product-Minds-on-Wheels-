@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "node scripts/prepare-test-db.mjs && playwright test"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -15,6 +16,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
