@@ -29,6 +29,19 @@ npm run dev                 # http://localhost:3000
 Rebuilding wipes the database, including every PM decision. That is the clean demo state.
 After pulling changes to `pipeline/pmw/db.py`, rebuild: the build drops and recreates every table.
 
+Equipment matches stay within the feature's allowed topics. Only `Wants` comments support option, package or
+cross-vehicle offers; complaints about standard equipment are marked `standard_but_failing`.
+Each vehicle keeps its 15 signal requirements plus up to five quick wins, ranked by distinct wishing comment IDs.
+Quick wins name the feature and option/package code or source vehicle, and use their own comments and scores.
+Comment IDs are the available counting unit; the source data does not identify unique people across comments.
+
+Schema update: `equipment_matches.feature` identifies the feature; the placeholder `equipment.trim` column was
+removed. Rebuild the database before running the updated app.
+
+Regression checks: `cd pipeline && uv run --extra llm python -m unittest discover -s tests -v`, then
+`cd ../web && node --test scripts/test-equipment-evidence.mjs && npx tsc --noEmit && npm run build`.
+Run `npm run test:e2e` after building; it uses a separate copy of the local database.
+
 **Priority display:** the list is grouped MoSCoW-style by priority score: Must have 65+, Should have 55+, Could have 45+,
 Won't have this time below 45 (`MOSCOW` in `web/components/ui.tsx`). The Act / Validate first / Monitor / Park chip is the
 separate decision quadrant (priority × confidence).

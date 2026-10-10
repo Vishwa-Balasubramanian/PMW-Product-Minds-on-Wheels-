@@ -5,6 +5,26 @@ import path from 'node:path';
 const testDb = path.resolve('..', 'db', 'pmw-smoke-run.sqlite');
 const db = () => new DatabaseSync(testDb, { readOnly: true });
 
+test('equipment quick win displays only its matching wishing comments', async ({ page, context }) => {
+  await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
+  const con = db();
+  try {
+    const r = con.prepare(`SELECT id,title,already_exists FROM requirements
+      WHERE vehicle='G60' AND kind='quick_win' AND title LIKE '%ventilated%'`).get() as
+      { id: string; title: string; already_exists: string };
+    expect(r).toBeTruthy();
+    const ids = [...new Set((JSON.parse(r.already_exists) as { feedback_ids: string[] }[])
+      .flatMap(m => m.feedback_ids))].sort();
+    await page.goto(`/vehicles/G60?req=${r.id}`);
+    await expect(page.getByRole('heading', { name: r.title, exact: true })).toBeVisible();
+    await expect(page.getByText(/Make ventilated front seats available on the successor/)).toBeVisible();
+    expect(r.title).toContain('7VB');
+    const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
+    const shownIds = await evidence.locator('li .font-mono').allTextContents();
+    expect(shownIds.sort()).toEqual(ids);
+  } finally { con.close(); }
+});
+
 test('G70 displays a complete offline requirement ladder', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const errors: string[] = [];

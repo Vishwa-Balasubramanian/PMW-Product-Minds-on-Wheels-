@@ -5,8 +5,6 @@ Owner: Arjun (data and evidence). Equipment parsing is best-effort and the obvio
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 from collections import defaultdict
 
 import openpyxl
@@ -217,64 +215,6 @@ def ingest_sales(con) -> None:
     wb.close()
 
 
-PRICE_RE = re.compile(r"^(?P<name>\S.*?)\s{2,}(?P<code>[0-9][0-9A-Z]{2}|[A-Z0-9]{3})\s+(?P<price>[\d.]+,[–-]|–,–)")
-PKG_RE = re.compile(r"^(?P<name>[A-ZÄÖÜ][A-ZÄÖÜ &\-]+PAKET[A-ZÄÖÜ ]*)\s{2,}(?P<code>[0-9A-Z]{3})\s+(?P<price>[\d.]+,[–-])")
-
-
-def _ingest_equipment_legacy(con, code: str) -> None:
-    """Parse the German equipment list using Poppler or the bundled Python fallback."""
-    pdf = RAW / VEHICLES[code]["options_file"]
-    if shutil.which("pdftotext"):
-        text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True).stdout
-    else:
-        try:
-            from pdfminer.high_level import extract_text
-            text = extract_text(str(pdf), laparams=None)
-        except ImportError:
-            db.issue(con, "equipment", "warning", "Neither pdftotext nor pdfminer is available; equipment list skipped.",
-                     "Install pipeline dependencies (uv sync) or Poppler and rebuild.", code)
-            return
-    package = None
-    n = 0
-    for line in text.splitlines():
-        s = line.rstrip()
-        if not s.strip():
-            continue
-        m = PKG_RE.match(s.strip())
-        if m:
-            package = m.group("name").strip()
-            price = float(m.group("price").replace(".", "").split(",")[0])
-            con.execute("INSERT INTO equipment (vehicle, name, code, price_eur, availability, package, raw) VALUES (?,?,?,?,?,?,?)",
-                        (code, package.title(), m.group("code"), price, "optional", None, s.strip()))
-            n += 1
-            continue
-        if s.strip().startswith("– ") and package:
-            con.execute("INSERT INTO equipment (vehicle, name, code, price_eur, availability, package, raw) VALUES (?,?,?,?,?,?,?)",
-                        (code, s.strip()[2:].strip(), None, None, "package_item", package.title(), s.strip()))
-            n += 1
-            continue
-        if not s.startswith(" ") and s.isupper() is False and "■" in s and "□" not in s:
-            name = re.split(r"\s{2,}", s.strip())[0]
-            con.execute("INSERT INTO equipment (vehicle, name, code, price_eur, availability, package, raw) VALUES (?,?,?,?,?,?,?)",
-                        (code, name, None, None, "standard", None, s.strip()))
-            n += 1
-            package = None
-            continue
-        m = PRICE_RE.match(s.strip())
-        if m:
-            price_txt = m.group("price")
-            price = None if price_txt.startswith("–") else float(price_txt.replace(".", "").split(",")[0])
-            con.execute("INSERT INTO equipment (vehicle, name, code, price_eur, availability, package, raw) VALUES (?,?,?,?,?,?,?)",
-                        (code, m.group("name").strip(), m.group("code"), price, "optional", None, s.strip()))
-            n += 1
-            package = None
-    db.issue(con, "equipment", "warning",
-             "Price lists cover Germany only (July 2026). No US or China equipment data was provided.",
-             "Equipment gaps for other markets are marked as an assumption.", code)
-    db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id=f"{code} price list",
-             action="parsed equipment list", after=f"{n} entries (best-effort parser)")
-
-
 def _walk_pdf_lines(node):
     if isinstance(node, LTTextLine):
         yield node
@@ -303,7 +243,7 @@ def _price_eur(text: str) -> float | None:
 
 
 def ingest_equipment(con, code: str) -> None:
-    """Read SA codes, euro prices and the per-trim availability marks from positioned PDF text."""
+    """Read SA codes, euro prices and availability marks from positioned PDF text."""
     pdf = RAW / VEHICLES[code]["options_file"]
     n = 0
     for page_no, page in enumerate(extract_pages(str(pdf))):
@@ -315,14 +255,13 @@ def ingest_equipment(con, code: str) -> None:
             marks = [(int(round(x)), s) for x, s in parts if s in ("■", "□") and 300 <= x < 540]
             price = next((_price_eur(s) for x, s in parts if x >= 260 and _price_eur(s) is not None), None)
             raw = " | ".join(s for _, s in parts)
-            trim = ",".join(f"col_{x}" for x, _ in marks) or None
             if codes and name:
                 option_code = codes[0][1]
                 is_package = "paket" in name.casefold()
                 package = name.title() if is_package else None
                 availability = "optional" if any(mark == "□" for _, mark in marks) or price is not None else "unknown"
-                con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,trim,raw) VALUES (?,?,?,?,?,?,?,?)",
-                            (code, name, option_code, price, availability, None, trim, f"page {page_no + 1}: {raw}"))
+                con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,raw) VALUES (?,?,?,?,?,?,?)",
+                            (code, name, option_code, price, availability, None, f"page {page_no + 1}: {raw}"))
                 n += 1
                 continue
             if not name:
@@ -335,8 +274,8 @@ def ingest_equipment(con, code: str) -> None:
                 availability, parent = "optional", None
             else:
                 continue
-            con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,trim,raw) VALUES (?,?,?,?,?,?,?,?)",
-                        (code, name, None, price, availability, parent, trim, f"page {page_no + 1}: {raw}"))
+            con.execute("INSERT INTO equipment (vehicle,name,code,price_eur,availability,package,raw) VALUES (?,?,?,?,?,?,?)",
+                        (code, name, None, price, availability, parent, f"page {page_no + 1}: {raw}"))
             n += 1
             if availability == "standard":
                 package = None

@@ -128,7 +128,14 @@ export type RequirementView = {
 export async function getRequirement(viewer: Viewer, id: string): Promise<RequirementView | undefined> {
   const req = await getRequirementRow(id);
   if (!req || !req.markets.some((m) => viewer.markets.includes(m as Market))) return undefined;
-  const allQuotes = await all<Quote>(
+  const feedbackIds = [...new Set(req.already_exists.flatMap((match) => match.feedback_ids))];
+  const allQuotes = req.kind === "quick_win" ? (
+    feedbackIds.length ? await all<Quote>(
+      `SELECT id, text, source, market, country, powertrain, severity, 'supports' AS role
+       FROM feedback WHERE vehicle = ? AND id IN ${inList(feedbackIds)} ORDER BY id`,
+      [req.vehicle, ...feedbackIds],
+    ) : []
+  ) : await all<Quote>(
     `SELECT f.id, f.text, f.source, f.market, f.country, f.powertrain, f.severity, e.role
      FROM signal_evidence e JOIN feedback f ON f.id = e.feedback_id WHERE e.signal_id = ?`,
     [req.signal_id],
@@ -302,7 +309,7 @@ export async function dataIssues(vehicle?: string) {
 
 export async function listSignals(vehicle: string): Promise<Signal[]> {
   const rows = await all(
-    `SELECT s.*, r.id AS requirement_id FROM signals s LEFT JOIN requirements r ON r.signal_id = s.id
+    `SELECT s.*, r.id AS requirement_id FROM signals s LEFT JOIN requirements r ON r.signal_id = s.id AND r.kind = 'signal'
      WHERE s.vehicle = ? ORDER BY s.n_negative DESC`,
     [vehicle],
   );

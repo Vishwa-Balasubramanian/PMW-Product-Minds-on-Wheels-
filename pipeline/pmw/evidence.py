@@ -10,19 +10,53 @@ from .themes import member_topics
 from . import db
 
 # English customer language to German option-list wording. Terms are intentionally
-# narrow: a match is emitted only when the same phrase is present in a comment
-# and an equipment row, so a topic-level similarity never becomes a claimed fact.
+# explicit: feature wording must occur in both the comment and the equipment row,
+# and the comment's label must name an allowed topic with the appropriate intent.
 EQUIPMENT_GLOSSARY = {
-    "ventilated seats": ("ventilat", "sitzbelüftung", "sitzbelueftung"),
-    "comfort access": ("comfort access", "keyless", "komfortzugang"),
-    "multi-contour seats": ("multi-contour", "multi contour", "multicontour", "multifunktionssitze"),
-    "surround view": ("surround view", "surround view system", "surround-view"),
-    "wireless charging": ("wireless charging", "wireless charger", "wireless charging ablage", "induktive lade"),
-    "massage seats": ("massage",),
-    "heated steering wheel": ("heated steering wheel", "lenkradheizung"),
-    "head-up display": ("head-up display", "head up display"),
-    "sun blinds": ("sun blind", "sonnenschutzrollo"),
-    "ambient lighting": ("ambient light", "ambientes licht"),
+    "ventilated front seats": {
+        "customer_terms": ("ventilat", "front cooling", "cooled seats", "seat coolers", "sitzbelüftung", "sitzbelueftung"),
+        "equipment_terms": ("sitzbelüftung", "sitzbelueftung"),
+        "topics": {"Seating, ventilate / heat", "Seats", "Vehicle, climatization", "Cooling"},
+    },
+    "comfort access": {
+        "customer_terms": ("comfort access", "keyless", "komfortzugang"),
+        "equipment_terms": ("komfortzugang",),
+        "topics": {"Comfort Access", "Vehicle, lock / unlock", "Digital Key"},
+    },
+    "multi-contour seats": {
+        "customer_terms": ("multi-contour", "multi contour", "multicontour", "multifunktionssitze"),
+        "equipment_terms": ("multifunktionssitze",),
+        "topics": {"Seats", "Seat memory", "Adjustment of lower lumbar support"},
+    },
+    "surround view": {
+        "customer_terms": ("surround view", "surround-view", "around view"),
+        "equipment_terms": ("surround view",),
+        "topics": {"Surround View", "All-round view"},
+    },
+    "wireless charging": {
+        "customer_terms": ("wireless charging", "wireless charger", "induktive lade"),
+        "equipment_terms": ("wireless charging ablage", "induktive lade"),
+        "topics": {"Mobile device, wireless charging"},
+    },
+    "massage seats": {
+        "customer_terms": ("massage",), "equipment_terms": ("massage",), "topics": {"Seat massage"},
+    },
+    "heated steering wheel": {
+        "customer_terms": ("heated steering wheel", "lenkradheizung"), "equipment_terms": ("lenkradheizung",),
+        "topics": {"Heated steering wheel", "Steering wheel"},
+    },
+    "head-up display": {
+        "customer_terms": ("head-up display", "head up display"), "equipment_terms": ("head-up display",),
+        "topics": {"Head-Up Display"},
+    },
+    "sun blinds": {
+        "customer_terms": ("sun blind", "sunblind", "sonnenschutzrollo"), "equipment_terms": ("sonnenschutzrollo",),
+        "topics": {"Sun protection", "Sun visor, front"},
+    },
+    "ambient lighting": {
+        "customer_terms": ("ambient light", "ambientes licht"), "equipment_terms": ("ambientes licht",),
+        "topics": {"Ambient light", "Vehicle interior, lighting"},
+    },
 }
 
 
@@ -30,36 +64,33 @@ def build_equipment_matches(con, vehicle: str) -> None:
     """Link only literal bilingual comment/equipment matches, retaining IDs and source rows."""
     con.execute("DELETE FROM equipment_matches WHERE vehicle = ?", (vehicle,))
     sigs = con.execute("SELECT id, topic FROM signals WHERE vehicle = ? AND in_scope = 1", (vehicle,)).fetchall()
+    rows = con.execute("SELECT * FROM equipment WHERE vehicle=?", (vehicle,)).fetchall()
+    other_rows = con.execute("SELECT * FROM equipment WHERE vehicle<>? AND availability='standard'", (vehicle,)).fetchall()
     for sig in sigs:
         topics = member_topics(sig['topic'])
         feedback = con.execute(
-            "SELECT DISTINCT f.id, f.text FROM feedback f JOIN feedback_labels l ON l.feedback_id=f.id "
+            "SELECT DISTINCT f.id, f.text, l.topic, l.feedback_type FROM feedback f JOIN feedback_labels l ON l.feedback_id=f.id "
             f"WHERE f.vehicle=? AND l.topic IN ({','.join('?' for _ in topics)}) "
             "AND l.feedback_type IN ('Wants','Difficult to Use','Defect')",
             (vehicle, *topics)).fetchall()
         if not feedback:
             continue
-        for english, terms in EQUIPMENT_GLOSSARY.items():
-            hits = [f for f in feedback if any(t in f["text"].casefold() for t in terms if " " in t or len(t) > 6)]
+        for feature, rule in EQUIPMENT_GLOSSARY.items():
+            if not rule["topics"].intersection(topics):
+                continue
+            hits = [f for f in feedback if f["topic"] in rule["topics"]
+                    and any(t in f["text"].casefold() for t in rule["customer_terms"])]
             if not hits:
                 continue
             pending = {}
-            rows = con.execute("SELECT * FROM equipment WHERE vehicle=?", (vehicle,)).fetchall()
+            wishes = [f for f in hits if f["feedback_type"] == "Wants"]
+            problems = [f for f in hits if f["feedback_type"] in ("Difficult to Use", "Defect")]
+            standard_here = False
             for row in rows:
                 name = (row["name"] or "").casefold()
-                if not any(t in name for t in terms):
+                if not any(t in name for t in rule["equipment_terms"]):
                     continue
-                failing_words = ("broken", "defective", "does not work", "not working", "malfunction",
-                                 "doesn't work", "stopped working", "not charging", "won't charge", "faulty")
-                failing_hits = [f for f in hits if any(w in f["text"].casefold() for w in failing_words)]
-                failing = english == "wireless charging" and row["availability"] == "standard" and bool(failing_hits)
-                match_type = ("standard_but_failing" if failing else
-                              "package_same_vehicle" if row["availability"] == "package_item" else
-                              "option_same_vehicle" if row["availability"] == "optional" else None)
-                if match_type is None:
-                    continue
-                matched_hits = failing_hits if failing else hits
-                ids = sorted({f["id"] for f in matched_hits})
+                standard_here |= row["availability"] == "standard"
                 name_clean = row["name"].lstrip("–- ").strip()
                 item_code, item_price = row["code"], row["price_eur"]
                 package_note = ""
@@ -68,23 +99,30 @@ def build_equipment_matches(con, vehicle: str) -> None:
                                          "AND code IS NOT NULL ORDER BY price_eur DESC LIMIT 1", (vehicle, row["package"])).fetchone()
                     if parent:
                         item_code, item_price = parent["code"], parent["price_eur"]
-                        package_note = f" Package: {parent['name']} ({parent['code']}, €{parent['price_eur']:,.0f})."
-                note = f"Customer wording '{english}' matches the German equipment row '{name_clean}'.{package_note} Price list: Germany, July 2026."
-                key = (match_type, name_clean, item_code, item_price, vehicle)
-                pending.setdefault(key, {"ids": set(), "note": note})["ids"].update(ids)
-            # A standard feature on another BMW is a trickle-down candidate.
-            for other in con.execute("SELECT * FROM equipment WHERE vehicle<>? AND availability='standard'", (vehicle,)).fetchall():
+                        price_note = f", €{parent['price_eur']:,.0f}" if parent["price_eur"] is not None else ""
+                        package_note = f" Package: {parent['name']} ({parent['code']}{price_note})."
+                # Offers must link to an identified option or parent package.
+                if row["availability"] in ("optional", "package_item") and wishes and item_code:
+                    match_type = "package_same_vehicle" if row["availability"] == "package_item" else "option_same_vehicle"
+                    note = f"Customer wording '{feature}' matches the German equipment row '{name_clean}'.{package_note} Price list: Germany, July 2026."
+                    key = (match_type, name_clean, item_code, item_price, vehicle)
+                    pending.setdefault(key, {"ids": set(), "note": note})["ids"].update(f["id"] for f in wishes)
+                if row["availability"] == "standard" and problems:
+                    note = f"Customers report a problem with standard '{name_clean}'. Price list: Germany, July 2026."
+                    key = ("standard_but_failing", name_clean, item_code, item_price, vehicle)
+                    pending.setdefault(key, {"ids": set(), "note": note})["ids"].update(f["id"] for f in problems)
+            # A feature already standard here is not a trickle-down opportunity.
+            for other in other_rows:
                 name = (other["name"] or "").casefold()
-                if any(t in name for t in terms):
-                    ids = sorted({f["id"] for f in hits})
+                if wishes and not standard_here and any(t in name for t in rule["equipment_terms"]):
                     name_clean = other["name"].lstrip("–- ").strip()
                     key = ("standard_other_vehicle", name_clean, other["code"], other["price_eur"], other["vehicle"])
                     pending.setdefault(key, {"ids": set(), "note":
-                        f"{name_clean} is marked standard on {other['vehicle']} in its German price list."})["ids"].update(ids)
+                        f"{name_clean} is marked standard on {other['vehicle']} in its German price list."})["ids"].update(f["id"] for f in wishes)
             for (match_type, name, option_code, price, source_vehicle), values in pending.items():
                 ids = sorted(values["ids"])
-                con.execute("INSERT INTO equipment_matches VALUES (?,?,?,?,?,?,?,?,?)",
-                            (vehicle, sig["id"], match_type, name, option_code, price, source_vehicle,
+                con.execute("INSERT INTO equipment_matches VALUES (?,?,?,?,?,?,?,?,?,?)",
+                            (vehicle, sig["id"], feature, match_type, name, option_code, price, source_vehicle,
                              db.dumps(ids), values["note"]))
                 db.audit(con, actor_type="system", actor="Pipeline", entity_type="signal", entity_id=sig["id"],
                          action="matched customer evidence to equipment", after=f"{match_type}: {name}",
