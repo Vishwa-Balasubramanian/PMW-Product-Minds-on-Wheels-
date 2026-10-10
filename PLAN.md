@@ -87,17 +87,24 @@ components and Gokul places them. Details and "done when" checks are in each per
 Merge order: Arjun 2 early (unblocks the meter UI); Vishwa 1 before Gokul polishes the Decision Card.
 Feature freeze two hours before the deadline, then rehearse at least five times.
 
-## 6. Demo story (5 minutes, 7 Series)
+## 6. Demo story (about 2 minutes of the 5-minute pitch, 7 Series)
 
-1. Home: three cars, region United States. The 1 Series is greyed out: not sold in the US.
-2. Open the 7 Series: the missing-voices warning.
-3. A requirement: photo of the part, customer voice, signal, root cause, need, requirement, real quotes with IDs.
-4. Priority and confidence side by side, every factor explained, its place in the decision matrix.
-5. **Challenge**: confidence drops and the requirement moves from Act to Validate first.
-6. Edit, then approve with a reason. Show the audit trail.
-7. **You already sell this** on a quick-win requirement.
-8. Switch region to China: thin evidence, US comments restricted, the access is logged.
-9. Data health: the traps in BMW's data and how we handled them.
+Pitch materials: [deck](docs/pitch/deck.md) · [demo script](docs/pitch/demo-script.md) (click by click, checklist,
+fallback) · [judge Q&A](docs/pitch/qa.md). Requirement IDs are hashes, so the demo uses titles.
+
+1. Home, region United States. The 1 Series is greyed out: not sold in the US.
+2. Open the 7 Series: the missing-voices warning (95% of comments from the US, which buys 29%; China 24% of sales, no comments).
+3. Open **"Everyday controls without menu hunting"** (Must have, priority 69, confidence 70, Act): photo of the
+   part, the ladder, real quotes with IDs (for example G70-1329), priority and confidence with every factor.
+4. **Challenge**: confidence 70 → 44, the requirement moves from Act to Validate first. Backup if already
+   challenged: "Comfortable cabin with understandable climate controls" (71 → 51).
+5. Edit the requirement (add Europe and China validation), then approve with a reason. Show the audit trail.
+6. Switch region to China: 10 requirements, no customer quote, 49 US and 1 Europe comment restricted, the access is logged.
+7. Workflow page: six automatic steps, one mandatory product-manager step.
+8. Export the requirement list as CSV (region-filtered, logged).
+
+Optional if time allows: the quick win "Offer massage seats outside €4,450 Executive Paket (9DA)" (You already sell this),
+and the Data health tab (traps in BMW's data).
 
 Pitch lines: "Language reasoning comes from AI. Decision metrics come from deterministic computation."
 "PMW helps BMW make product decisions they can defend, not just AI suggestions they have to trust."
