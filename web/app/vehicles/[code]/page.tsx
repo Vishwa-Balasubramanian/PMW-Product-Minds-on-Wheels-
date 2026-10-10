@@ -62,13 +62,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         </div>
       </section>
 
-      <nav className="sticky top-[84px] z-20 border-b border-line bg-white" aria-label="Views">
+      <nav className="sticky top-[72px] z-20 border-b border-line bg-white" aria-label="Views">
         <div className="container-x flex gap-8 overflow-x-auto">
           {VIEWS.map((v) => (
             <Link
               key={v.k}
               href={`/vehicles/${code}?view=${v.k}`}
-              className={`whitespace-nowrap border-b-2 py-4 text-[15px] font-medium ${view === v.k ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
+              className={`whitespace-nowrap border-b-2 py-4 text-[13px] font-bold uppercase tracking-[0.05em] ${view === v.k ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
             >
               {v.label}
             </Link>
@@ -114,7 +114,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const events = detail ? await auditFor(detail.requirement.id) : [];
     return (
       <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-3 lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:self-start">
+        <aside className="flex flex-col gap-3 lg:sticky lg:top-[140px] lg:max-h-[calc(100vh-170px)] lg:self-start">
           <div className="flex flex-wrap gap-1.5">
             {[null, "act", "validate", "monitor", "park"].map((q) => (
               <Link

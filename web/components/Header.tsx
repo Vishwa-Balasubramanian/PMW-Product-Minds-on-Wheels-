@@ -1,17 +1,16 @@
 import Link from "next/link";
 import type { Viewer } from "@/lib/gate";
+import { BrandLogo } from "./BrandLogo";
 import { RegionPicker } from "./RegionPicker";
 
-export function Wordmark({ light = false }: { light?: boolean }) {
+/** Our own PMW wordmark: "P" in BMW Blue, "MW" in dark grey. Never combined into the BMW logo. */
+export function Wordmark() {
   return (
-    <Link href="/" className={`flex items-center gap-3 ${light ? "text-white" : "text-ink"}`}>
-      <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-current text-[13px] font-bold tracking-wide">
-        PMW
+    <Link href="/" className="flex items-baseline gap-2 text-ink">
+      <span className="text-[22px] font-bold uppercase tracking-[0.02em] leading-none">
+        <span className="pmw-p text-blue">P</span><span>MW</span>
       </span>
-      <span className="hidden text-[13px] leading-tight sm:block">
-        <span className="block font-semibold uppercase tracking-[0.08em]">Product Minds</span>
-        <span className="block font-light uppercase tracking-[0.08em]">on Wheels</span>
-      </span>
+      <span className="hidden text-[12px] font-light text-ink-3 sm:inline">Product Manager&apos;s Workbench</span>
     </Link>
   );
 }
@@ -23,23 +22,26 @@ const NAV = [
   { href: "/audit", label: "Audit trail" },
 ];
 
-/** variant "overlay" sits on top of photography (home). "solid" is the white app header. */
-export function Header({ viewer, variant = "solid" }: { viewer: Viewer; variant?: "overlay" | "solid" }) {
-  const light = variant === "overlay";
+/** White 72px header: BMW logo (provided file), divider, PMW wordmark, nav, region picker, prototype label. */
+export function Header({ viewer }: { viewer: Viewer; variant?: "overlay" | "solid" }) {
   return (
-    <header className={light ? "absolute inset-x-0 top-0 z-30" : "sticky top-0 z-30 bg-white"}>
+    <header className="sticky top-0 z-30 bg-white">
       <div className="container-x">
-        <div className={`flex h-[84px] items-center gap-8 border-b ${light ? "border-white/60" : "border-line"}`}>
-          <Wordmark light={light} />
-          <nav className="hidden items-center gap-7 md:flex" aria-label="Main">
+        <div className="flex h-[72px] items-center gap-6 border-b border-line">
+          <div className="flex items-center gap-4">
+            <BrandLogo />
+            <Wordmark />
+          </div>
+          <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className={`text-[15px] font-medium ${light ? "text-white hover:text-white/75" : "text-ink hover:text-blue"}`}>
+              <Link key={n.href} href={n.href} className="text-[13px] font-bold uppercase tracking-[0.05em] text-ink hover:text-blue">
                 {n.label}
               </Link>
             ))}
           </nav>
-          <div className="ml-auto">
-            <RegionPicker region={viewer.region} light={light} />
+          <div className="ml-auto flex items-center gap-6">
+            <RegionPicker region={viewer.region} />
+            <span className="hidden text-[11px] text-ink-3 xl:inline">for BMW Group · Hackathon Prototype</span>
           </div>
         </div>
       </div>
