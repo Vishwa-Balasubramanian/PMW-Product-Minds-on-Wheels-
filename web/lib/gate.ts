@@ -85,6 +85,7 @@ function toRequirement(r: Row): Requirement {
     contradictions: parse(r.contradictions as string, []),
     survey: parse(r.survey as string, []),
     conflicts: parse(r.conflicts as string, []),
+    already_exists: parse(r.already_exists as string, []),
     priority_factors: parse(r.priority_factors as string, {}),
     confidence_factors: parse(r.confidence_factors as string, {}),
     challenge: parse(r.challenge as string, { issues: [], revised_confidence: 0 }),
