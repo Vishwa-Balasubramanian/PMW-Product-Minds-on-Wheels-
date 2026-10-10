@@ -10,13 +10,13 @@ function loadTs(file, imports = {}) {
   const { outputText } = ts.transpileModule(readFileSync(new URL(file, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   });
-  const module = { exports: {} };
+  const loadedModule = { exports: {} };
   const require = (name) => {
     assert.ok(name in imports, `Unexpected import: ${name}`);
     return imports[name];
   };
-  new Function("require", "module", "exports", outputText)(require, module, module.exports);
-  return module.exports;
+  new Function("require", "module", "exports", outputText)(require, loadedModule, loadedModule.exports);
+  return loadedModule.exports;
 }
 
 test("quick wins show their own wishes, preserve region restrictions, and do not duplicate signals", async () => {
@@ -64,6 +64,9 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
     assert.deepEqual(view.quotes.map((q) => q.id), ["wish-us"]);
     assert.equal(view.quotes[0].role, "supports");
     assert.deepEqual(view.hidden, { EU: 1 });
+    assert.match(view.requirement.customer_voice, /wish-us/);
+    assert.doesNotMatch(view.requirement.customer_voice, /wish-eu/);
+    assert.equal(await gate.getRequirement({ ...viewer, region: "CN", markets: ["CN"] }, "R-quick"), undefined);
     assert.equal((await all("SELECT action FROM audit_events WHERE entity_id='R-quick'"))[0].action,
       "viewed evidence (other markets restricted)");
     const allView = await gate.getRequirement({ ...viewer, region: "ALL", markets: ["US", "EU", "CN", "ROW"] }, "R-quick");
