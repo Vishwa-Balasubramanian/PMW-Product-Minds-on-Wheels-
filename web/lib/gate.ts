@@ -5,7 +5,7 @@ import type { InStatement } from "@libsql/client";
 import { cookies } from "next/headers";
 import { all, nowIso, one, parse, writeBatch } from "./db";
 import { DEFAULT_REGION, MARKET_LABEL, MARKETS, REGIONS, REGION_COOKIE, isRegion, marketsFor, type Market, type RegionCode } from "./regions";
-import type { AuditEvent, Quote, Requirement, Signal, Weights } from "./types";
+import type { AuditEvent, HappinessRow, Quote, Requirement, Signal, Weights } from "./types";
 
 export type Viewer = { region: RegionCode; markets: Market[]; label: string; actor: string };
 
@@ -264,6 +264,47 @@ export async function auditLog(opts: { vehicle?: string; limit?: number } = {}):
 }
 
 // ---------- vehicle-level evidence ----------
+
+/** Live approval coverage. Missing negative evidence is unknown, never a perfect score.
+ * Counts use full membership, not the 40-comment evidence display sample.
+ * Only viewer-authorized markets are returned; weights remain shares of global 2025 sales.
+ */
+export async function happiness(viewer: Viewer, vehicle: string): Promise<HappinessRow[]> {
+  const markets = MARKETS.filter((market) => viewer.markets.includes(market));
+  if (!markets.length) return [];
+  const rows = await all<{ market: string; negative: number; covered: number; sales_weight: number | null }>(
+    `WITH eligible AS (
+       SELECT sf.signal_id, f.id, f.market FROM signal_feedback sf
+       JOIN signals s ON s.id=sf.signal_id AND s.in_scope=1
+       JOIN feedback f ON f.id=sf.feedback_id AND f.vehicle=s.vehicle
+       WHERE f.vehicle=? AND f.market IN ${inList(markets)}
+     ), coverage AS (
+       SELECT e.market, COUNT(DISTINCT e.id) AS negative,
+         COUNT(DISTINCT CASE WHEN EXISTS (
+           SELECT 1 FROM requirements r WHERE r.vehicle=? AND r.status='approved' AND (
+             (r.kind='signal' AND r.signal_id=e.signal_id) OR
+             (r.kind='quick_win' AND EXISTS (
+               SELECT 1 FROM json_each(r.already_exists) m,
+                 json_each(json_extract(m.value,'$.feedback_ids')) fid WHERE fid.value=e.id
+             ))
+           )
+         ) THEN e.id END) AS covered
+       FROM eligible e GROUP BY e.market
+     ), volumes AS (
+       SELECT market, SUM(volume) AS volume FROM sales WHERE vehicle=? AND year=2025 GROUP BY market
+     )
+     SELECT visible.value AS market, COALESCE(c.negative,0) AS negative, COALESCE(c.covered,0) AS covered,
+       1.0 * COALESCE(v.volume,0) / NULLIF((SELECT SUM(volume) FROM volumes),0) AS sales_weight
+     FROM json_each(?) visible LEFT JOIN coverage c ON c.market=visible.value
+     LEFT JOIN volumes v ON v.market=visible.value`,
+    [vehicle, ...markets, vehicle, vehicle, JSON.stringify(markets)],
+  );
+  return rows.map((row) => ({
+    market: row.market, negativeComments: Number(row.negative), coveredComments: Number(row.covered),
+    share: row.negative > 0 ? Number(row.covered) / Number(row.negative) : null,
+    salesWeight: row.sales_weight === null ? null : Number(row.sales_weight),
+  }));
+}
 
 export async function getWeights(): Promise<Weights> {
   const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'weights'");

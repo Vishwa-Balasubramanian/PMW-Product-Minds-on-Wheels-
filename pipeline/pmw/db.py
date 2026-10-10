@@ -144,6 +144,14 @@ CREATE TABLE IF NOT EXISTS signal_evidence (
   role TEXT NOT NULL               -- supports | contradicts
 );
 
+-- Complete negative-comment membership; signal_evidence is only a bounded display sample.
+CREATE TABLE IF NOT EXISTS signal_feedback (
+  signal_id TEXT NOT NULL,
+  feedback_id TEXT NOT NULL,
+  PRIMARY KEY (signal_id, feedback_id)
+);
+CREATE INDEX IF NOT EXISTS idx_signal_feedback_comment ON signal_feedback(feedback_id);
+
 CREATE TABLE IF NOT EXISTS requirements (
   id TEXT PRIMARY KEY,             -- R-G70-001
   vehicle TEXT NOT NULL,
@@ -206,7 +214,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 PIPELINE_TABLES = [
     "vehicles", "feedback", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
-    "data_issues", "representation", "market_conflicts", "signals", "signal_evidence",
+    "data_issues", "representation", "market_conflicts", "signals", "signal_evidence", "signal_feedback",
     "requirements", "audit_events", "settings",
 ]
 

@@ -126,6 +126,18 @@ export type Signal = {
   requirement_id: string | null;
 };
 
+/** Complete negative membership, distinct from the sampled signal_evidence table. */
+export type SignalFeedback = { signal_id: string; feedback_id: string };
+
+/** Evidence coverage by approved requirements, not measured customer satisfaction. */
+export type HappinessRow = {
+  market: string;
+  negativeComments: number;
+  coveredComments: number;
+  share: number | null;
+  salesWeight: number | null;
+};
+
 export type Weights = {
   priority: Record<string, number>;
   confidence: Record<string, number>;

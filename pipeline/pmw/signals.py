@@ -133,6 +133,8 @@ def build(con, vehicle: str) -> list[str]:
             (sid, vehicle, s["topic"], len(s["comments"]), len(s["neg"]), len(s["likes"]), s["n_hard"], s["n_defect"],
              s["n_wants"], s["dominant"], s["severity"], s["competitors"], json.dumps(s["by_market"]),
              json.dumps(s["by_source"]), int(ok), why))
+        con.executemany("INSERT INTO signal_feedback (signal_id,feedback_id) VALUES (?,?)",
+                        [(sid, fid) for fid in s['neg']])
         for fid, _ in select_evidence(s['neg'], 40):
             con.execute("INSERT INTO signal_evidence (signal_id, feedback_id, role) VALUES (?,?,?)", (sid, fid, "supports"))
         for fid, _ in select_evidence(s['likes'], 10):
@@ -142,5 +144,5 @@ def build(con, vehicle: str) -> list[str]:
                      action="excluded signal from requirements", rationale=why)
         ids.append(sid)
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id=vehicle,
-             action="detected signals", after=f"{len(ids)} themes with customer comments; map {THEME_VERSION}")
+             action="detected signals", after=f"{len(ids)} themes with customer comments; map {THEME_VERSION}; full negative membership retained")
     return ids
