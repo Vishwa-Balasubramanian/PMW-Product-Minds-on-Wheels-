@@ -77,7 +77,7 @@ one blue (`--color-blue`). Requirement list = MoSCoW groups. Decision Card = pho
 
 ## 5. Your tasks, in priority order
 
-### Task 1: Requirement export (BMW deliverable 2)
+### Task 1: Requirement export (BMW deliverable 2) · DONE (#3)
 - Route handler `GET /api/export?vehicle=G70&format=csv|json`, plus an **Export** button on the vehicle page.
 - One row per requirement visible in the viewer's region, with BMW's fields:
   `id`, `title`, `description` (requirement text), `customer_need`, `root_cause`, `findings_and_sources`
@@ -117,7 +117,7 @@ one blue (`--color-blue`). Requirement list = MoSCoW groups. Decision Card = pho
   Link the comment IDs. A "Quick wins" chip in the list for `kind = 'quick_win'`.
 - Wait for Arjun's fix before demoing: today some matches sit on unrelated topics (see the review on PR #1).
 
-### Task 5: Challenge narrative (after Vishwa's PR)
+### Task 5: Challenge narrative · DONE (rendered in #2)
 - Render `requirement.challenge.narrative` (optional string) in the "Challenge result" section of the Decision Card.
 
 ### Task 6: Happiness Meter UI (after Arjun's data function)
@@ -146,3 +146,20 @@ Vishwa and Arjun open PRs; you merge them. Check before merging:
 - the 7 Series demo still works (list, Decision Card, Challenge, region switch, audit).
 After merging a schema change, everyone runs `uv run pmw build`; update the live site with `db:push` and deploy.
 Ask Vishwa to enable branch protection on `main` (Settings → Branches → require a pull request).
+
+## 7. Phase 2 (from 10 October, evening)
+
+Before starting: `git pull`, `cd pipeline && uv sync && uv run pmw build`, `cd web && npm install`.
+Requirement IDs are stable hashes now (e.g. `R-G70-73240d3417`). All web data access is async through `web/lib/gate.ts`.
+One task per branch and pull request; never merge your own pull request.
+
+Already merged on top of this brief: export (#3), Vishwa's workflow (#2), Arjun's fixed quick wins (#4),
+scroll fix (#5), BMW Group branding (#6). Header is 72px; brand tokens live in `web/app/globals.css`.
+
+1. **Workflow page** (Task 2 above). In progress on `gokul/workflow-page`.
+2. **"You already sell this" banner + Quick wins filter** (Task 4 above, now unblocked). Quick wins have
+   `kind = 'quick_win'` and sit mostly in Park, so add a "Quick wins" chip to the list filters and the banner on the card.
+3. **Priority sliders + strategy presets** (Task 3 above).
+4. **Happiness Meter UI** (Task 6 above) once Arjun's `happiness(viewer, vehicle)` is merged.
+5. **Place teammates' components** on the Decision Card: Vishwa's `EvidenceMeter`, Arjun's market-conflict content.
+6. **Pitch lead** (Task 7 above): collect Vishwa's and Arjun's slide notes from `docs/pitch/`.
