@@ -1,3 +1,5 @@
+> **Phase 2 is in its own brief: [phase-2/VISHWA.md](phase-2/VISHWA.md).** This file covers Phase 1 (finished).
+
 # Agent brief: Vishwa (AI lead) · Product Minds on Wheels
 
 You are working on **Product Minds on Wheels (PMW)**, a hackathon prototype for the BMW challenge

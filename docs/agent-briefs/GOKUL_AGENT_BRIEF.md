@@ -1,3 +1,5 @@
+> **Phase 2 is in its own brief: [phase-2/GOKUL.md](phase-2/GOKUL.md).** This file covers Phase 1 (finished).
+
 # Agent brief: Gokul (product, frontend and demo lead) · Product Minds on Wheels
 
 You are working on **Product Minds on Wheels (PMW)**, a hackathon prototype for the BMW challenge
