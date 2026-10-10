@@ -93,7 +93,7 @@ def run_json(*, task: str, model: str, instruction: str, payload: dict, schema: 
     if path.exists():
         try:
             cached = json.loads(path.read_text(encoding="utf-8"))
-            if cached.get("version") != 1 or cached.get("input_sha256") != key:
+            if not isinstance(cached, dict) or cached.get("version") != 1 or cached.get("input_sha256") != key:
                 raise ValueError("Cache input fingerprint mismatch")
             data = cached["data"]
             if cached.get("output_sha256") != digest(data):
@@ -111,27 +111,38 @@ def run_json(*, task: str, model: str, instruction: str, payload: dict, schema: 
             import anthropic
         except ImportError:
             return Result(None, "unavailable", key, "Install the llm dependency extra")
-        client = anthropic.Anthropic(timeout=90.0, max_retries=1)
+        try:
+            with anthropic.Anthropic(timeout=90.0, max_retries=1) as client:
+                def transport(messages):
+                    response = client.messages.create(
+                        model=model, max_tokens=max_tokens,
+                        system=[{"type": "text", "text": SYSTEM,
+                                 "cache_control": {"type": "ephemeral"}}],
+                        messages=messages,
+                        output_config={"format": {"type": "json_schema", "schema": schema}})
+                    if response.stop_reason != "end_turn":
+                        raise ValueError("Generation stopped before a complete answer")
+                    return "".join(b.text for b in response.content if b.type == "text")
 
-        def transport(messages):
-            response = client.messages.create(
-                model=model, max_tokens=max_tokens,
-                system=[{"type": "text", "text": SYSTEM,
-                         "cache_control": {"type": "ephemeral"}}],
-                messages=messages,
-                output_config={"format": {"type": "json_schema", "schema": schema}})
-            if response.stop_reason != "end_turn":
-                raise ValueError("Generation stopped before a complete answer")
-            return "".join(b.text for b in response.content if b.type == "text")
+                return _generate(spec, path, validate, transport)
+        except Exception as exc:
+            return Result(None, "unavailable", key, f"AI request failed ({type(exc).__name__})")
+    return _generate(spec, path, validate, transport)
 
-    messages = [{"role": "user", "content": instruction + "\nEVIDENCE_JSON:\n" + canonical(payload)}]
+
+def _generate(spec: dict, path: Path, validate, transport) -> Result:
+    key, model = digest(spec), spec['model']
+    messages = [{"role": "user", "content": spec['instruction'] + "\nEVIDENCE_JSON:\n" + canonical(spec['payload'])}]
+
     for attempt in range(2):
         try:
             raw = transport(messages)
+        except Exception as exc:
+            # Transport errors can contain request data, including ValueError bodies.
+            return Result(None, "unavailable", key, f"AI request failed ({type(exc).__name__})")
+        try:
             data = json.loads(raw)
             validate(data)
-            save_cache(path, spec, data, f"llm:{model}")
-            return Result(data, f"llm:{model}", key)
         except (ValueError, TypeError, KeyError) as exc:
             error = f"Validation failed: {exc}"
             if attempt == 0:
@@ -139,7 +150,10 @@ def run_json(*, task: str, model: str, instruction: str, payload: dict, schema: 
                 messages.append({"role": "user", "content":
                                  "The previous answer failed validation: " + error +
                                  ". Return a corrected JSON object using only the original evidence."})
-        except Exception as exc:
-            # SDK exceptions can include request content or secrets. Log only the type.
-            return Result(None, "unavailable", key, f"AI request failed ({type(exc).__name__})")
+            continue
+        try:
+            save_cache(path, spec, data, f"llm:{model}")
+        except OSError:
+            return Result(None, "unavailable", key, "Could not persist validated AI cache")
+        return Result(data, f"llm:{model}", key)
     return Result(None, "invalid", key, error)

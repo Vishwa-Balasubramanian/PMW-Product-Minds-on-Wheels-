@@ -130,12 +130,12 @@ export function AuditTimeline({ events }: { events: AuditEvent[] }) {
   return (
     <ol className="relative flex flex-col">
       {events.map((e) => (
-        <li key={e.id} className="relative grid grid-cols-[132px_14px_1fr] gap-3 py-2 text-[13px]">
-          <time className="pt-0.5 text-right font-mono text-[11.5px] text-ink-3" dateTime={e.ts}>
+        <li key={e.id} className="relative grid grid-cols-[14px_minmax(0,1fr)] gap-x-3 gap-y-1 py-2 text-[13px] sm:grid-cols-[132px_14px_minmax(0,1fr)]">
+          <time className="col-start-2 pt-0.5 font-mono text-[11.5px] text-ink-3 sm:col-start-1 sm:text-right" dateTime={e.ts}>
             {new Date(e.ts).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </time>
-          <span className={`mt-1.5 h-2.5 w-2.5 rounded-full ${ACTOR_DOT[e.actor_type] ?? "bg-ink-3"}`} aria-hidden="true" />
-          <div>
+          <span className={`col-start-1 row-start-1 mt-1.5 h-2.5 w-2.5 rounded-full sm:col-start-2 ${ACTOR_DOT[e.actor_type] ?? "bg-ink-3"}`} aria-hidden="true" />
+          <div className="col-start-2 min-w-0 [overflow-wrap:anywhere] sm:col-start-3 sm:row-start-1">
             <span className="font-semibold text-ink">{e.actor}</span> <span className="text-ink-2">{e.action}</span>
             {(e.before !== null || e.after !== null) && (
               <div className="mt-0.5 text-ink-2">

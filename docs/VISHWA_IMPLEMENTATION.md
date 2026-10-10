@@ -33,6 +33,8 @@ For browser regression checks, run `npx playwright install chromium` once, then
 set `PW_CHANNEL=msedge` instead of downloading Chromium. Tests back up the local
 database into `db/pmw-smoke-run.sqlite` using Node's SQLite API. The test server
 explicitly disables remote database settings and never changes hosted PM decisions.
+Set `PMW_TEST_SOURCE` to an absolute SQLite path to test a separate verification
+build without touching an existing local session.
 
 `build` recreates the database, including decisions. Keep a database backup before
 rebuilding a session whose PM decisions matter. Tests use separate databases.
@@ -150,8 +152,8 @@ a cited hypothesis, customer need, observable successor behaviour and challenge
 narrative. The verification report separates core requirements from candidates so
 the extra equipment findings cannot hide an incomplete core ladder.
 
-Validation passed: 30 Python tests (including the eight real inputs), the pipeline
-build and verification report, TypeScript, production Next.js build, and four
-Playwright tests for the ladder, Challenge/audit, China quote filtering and Data
-health. The production build emits the existing dynamic database-path tracing
-warning from `web/lib/db.ts`; it does not prevent the build or local smoke tests.
+The follow-up verification covers 36 Python tests and 14 Playwright tests,
+including every vehicle/view/region combination, PM decisions, request failures,
+mobile layout and SDK requests using simulated HTTP responses. See
+[the verification report](reports/vishwa-verification.md) for fixes, commands,
+results and the remaining live-service and dependency limitations.

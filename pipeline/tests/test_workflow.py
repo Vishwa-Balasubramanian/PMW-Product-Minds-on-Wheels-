@@ -86,6 +86,65 @@ class GenerationTests(unittest.TestCase):
         self.assertIsNone(result.data)
         self.assertIn('cache', result.error.lower())
 
+    def test_cache_with_valid_json_but_wrong_shape_falls_back(self):
+        self.request(transport=lambda _: json.dumps(self.data))
+        path=next(self.cache.glob('*.json'))
+        for wrong in ([], None, 'not an object', 42):
+            path.write_text(json.dumps(wrong),encoding='utf-8')
+            with patch.dict(os.environ,{},clear=True):
+                result=self.request()
+            self.assertIsNone(result.data)
+            self.assertIn('cache',result.error.lower())
+
+    def test_transport_validation_error_does_not_leak_details(self):
+        def broken(_):
+            raise ValueError('secret-key-do-not-print')
+        result=self.request(transport=broken)
+        self.assertNotIn('secret-key',result.error)
+
+    def test_cache_write_failure_falls_back_without_repeating_generation(self):
+        calls=[]
+        with patch('pmw.ai.save_cache',side_effect=OSError('private path')):
+            result=self.request(transport=lambda _: calls.append(1) or json.dumps(self.data))
+        self.assertIsNone(result.data)
+        self.assertEqual(len(calls),1)
+        self.assertNotIn('private path',result.error)
+
+    def test_anthropic_sdk_request_and_response_without_network(self):
+        import anthropic
+        import httpx2 as httpx
+        requests=[]
+        def respond(request):
+            requests.append(json.loads(request.content))
+            return httpx.Response(200,json={'id':'msg_test','type':'message','role':'assistant',
+                'model':'test-model','content':[{'type':'text','text':json.dumps(self.data)}],
+                'stop_reason':'end_turn','stop_sequence':None,
+                'usage':{'input_tokens':10,'output_tokens':10}})
+        client=anthropic.Anthropic(api_key='test-not-a-real-key',max_retries=0,
+                                  http_client=httpx.Client(transport=httpx.MockTransport(respond)))
+        with patch.dict(os.environ,{'ANTHROPIC_API_KEY':'test-not-a-real-key','PMW_OFFLINE':'0'}), \
+             patch('anthropic.Anthropic',return_value=client):
+            result=self.request()
+        self.assertEqual(result.data,self.data)
+        self.assertEqual(requests[0]['output_config']['format']['schema'],derive.SCHEMA)
+        self.assertEqual(requests[0]['model'],'test-model')
+        self.assertEqual(requests[0]['max_tokens'],2000)
+        self.assertTrue(client.is_closed())
+
+    def test_anthropic_auth_failure_falls_back_without_network(self):
+        import anthropic
+        import httpx2 as httpx
+        client=anthropic.Anthropic(api_key='test-not-a-real-key',max_retries=0,
+            http_client=httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(401,json={
+                'type':'error','error':{'type':'authentication_error','message':'secret provider details'}}))))
+        with patch.dict(os.environ,{'ANTHROPIC_API_KEY':'test-not-a-real-key','PMW_OFFLINE':'0'}), \
+             patch('anthropic.Anthropic',return_value=client):
+            result=self.request()
+        self.assertIsNone(result.data)
+        self.assertNotIn('secret provider',result.error)
+        self.assertFalse(list(self.cache.glob('*.json')))
+        self.assertTrue(client.is_closed())
+
     def test_request_exception_does_not_leak_details(self):
         def broken(_):
             raise RuntimeError('secret-key-do-not-print')
@@ -244,6 +303,23 @@ class SuppliedDataTests(unittest.TestCase):
         values=dict(self.con.execute("SELECT quadrant,COUNT(*) FROM requirements WHERE vehicle='G70' AND kind='signal' GROUP BY quadrant"))
         self.assertEqual(set(values),{'act','validate','monitor','park'})
         self.assertTrue(all(n>=2 for n in values.values()),values)
+
+    def test_verify_detects_changed_metrics_after_a_challenge(self):
+        self.con.execute('SAVEPOINT changed_score')
+        try:
+            rid=self.con.execute("SELECT id FROM requirements WHERE vehicle='G70' LIMIT 1").fetchone()[0]
+            self.con.execute("UPDATE requirements SET challenged=1,confidence=json_extract(challenge,'$.revised_confidence') WHERE id=?",(rid,))
+            row=self.con.execute('SELECT priority,confidence FROM requirements WHERE id=?',(rid,)).fetchone()
+            self.con.execute('UPDATE requirements SET quadrant=? WHERE id=?',
+                             (score.quadrant(*row,score.DEFAULT_WEIGHTS['thresholds']),rid))
+            self.assertTrue(verify.inspect(self.con)['passed'])
+            self.con.execute('UPDATE requirements SET priority=priority-1,confidence=confidence+1 WHERE id=?',(rid,))
+            errors=verify.inspect(self.con)['errors']
+            self.assertIn(f'{rid}: inconsistent priority',errors)
+            self.assertIn(f'{rid}: inconsistent confidence',errors)
+        finally:
+            self.con.execute('ROLLBACK TO changed_score')
+            self.con.execute('RELEASE changed_score')
 
     def test_equipment_quick_wins_keep_specific_customer_tasks(self):
         quick=self.con.execute("SELECT COUNT(*) FROM requirements WHERE kind='quick_win' AND already_exists!='[]'").fetchone()[0]

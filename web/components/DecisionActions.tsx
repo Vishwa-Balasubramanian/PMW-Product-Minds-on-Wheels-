@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Requirement } from "@/lib/types";
 
 type Mode = null | "reject" | "validate" | "edit" | "approve" | "challenge";
@@ -21,20 +21,36 @@ export function DecisionActions({ r }: { r: Requirement }) {
   const [why, setWhy] = useState("");
   const [fields, setFields] = useState({ title: r.title, requirement: r.requirement, customer_need: r.customer_need ?? "" });
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [refreshing, start] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const pending = saving || refreshing;
 
   async function send(action: string) {
+    if (submitting.current || refreshing) return;
+    submitting.current = true;
+    setSaving(true);
     setError(null);
-    const res = await fetch(`/api/requirements/${r.id}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action, rationale: why, fields: action === "edit" ? fields : undefined }),
-    });
-    const data = (await res.json()) as { ok: boolean; error?: string };
-    if (!data.ok) return setError(data.error ?? "Something went wrong.");
-    setMode(null);
-    setWhy("");
-    start(() => router.refresh());
+    try {
+      const res = await fetch(`/api/requirements/${r.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, rationale: why, fields: action === "edit" ? fields : undefined }),
+      });
+      const data = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Could not save this decision. Please try again.");
+        return;
+      }
+      setMode(null);
+      setWhy("");
+      start(() => router.refresh());
+    } catch {
+      setError("Could not save this decision. Check your connection and try again.");
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
   }
 
   const decided = r.status === "approved" || r.status === "rejected";
@@ -92,15 +108,15 @@ export function DecisionActions({ r }: { r: Requirement }) {
               required={PROMPT[mode].required}
             />
           </label>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
+          {error && <p role="alert" className="text-[13px] text-danger">{error}</p>}
           <div className="flex gap-2">
             <button type="submit" className="btn-primary btn-sm" disabled={pending}>{PROMPT[mode].submit}</button>
-            <button type="button" className="btn-outline btn-sm" onClick={() => { setMode(null); setError(null); }}>Cancel</button>
+            <button type="button" className="btn-outline btn-sm" disabled={pending} onClick={() => { setMode(null); setError(null); }}>Cancel</button>
           </div>
           <p className="text-[12px] text-ink-3">Recorded in the audit trail with your region and the time.</p>
         </form>
       )}
-      {!mode && error && <p className="text-[13px] text-danger">{error}</p>}
+      {!mode && error && <p role="alert" className="text-[13px] text-danger">{error}</p>}
     </div>
   );
 }

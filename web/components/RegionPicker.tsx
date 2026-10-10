@@ -9,7 +9,11 @@ export function RegionPicker({ region, light = false }: { region: RegionCode; li
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<RegionCode>(region);
-  const [pending, start] = useTransition();
+  const [refreshing, start] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const pending = saving || refreshing;
   const dialog = useRef<HTMLDialogElement>(null);
   const current = REGIONS.find((r) => r.code === region)!;
 
@@ -21,16 +25,29 @@ export function RegionPicker({ region, light = false }: { region: RegionCode; li
   }, [open]);
 
   async function apply() {
-    await fetch("/api/region", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ region: choice }) });
-    setOpen(false);
-    start(() => router.refresh());
+    if (submitting.current || refreshing) return;
+    submitting.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/region", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ region: choice }) });
+      if (!response.ok || !(await response.json()).ok) throw new Error("Region update failed");
+      setOpen(false);
+      start(() => router.refresh());
+    } catch {
+      setError("Could not change region. Check your connection and try again.");
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => { setChoice(region); setOpen(true); }}
+        onClick={() => { setChoice(region); setError(null); setOpen(true); }}
+        disabled={pending}
         className={`flex items-center gap-2 text-left ${light ? "text-white" : "text-ink"}`}
         aria-haspopup="dialog"
       >
@@ -68,9 +85,10 @@ export function RegionPicker({ region, light = false }: { region: RegionCode; li
             ))}
           </fieldset>
           <p className="mt-4 text-[12px] text-ink-3">Prototype: in production your region comes from BMW single sign-on.</p>
+          {error && <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p>}
           <div className="mt-5 flex gap-3">
-            <button type="button" className="btn-primary flex-1" onClick={apply}>Apply</button>
-            <button type="button" className="btn-outline" onClick={() => setOpen(false)}>Cancel</button>
+            <button type="button" className="btn-primary flex-1" disabled={pending} onClick={apply}>Apply</button>
+            <button type="button" className="btn-outline" disabled={pending} onClick={() => setOpen(false)}>Cancel</button>
           </div>
         </div>
       </dialog>

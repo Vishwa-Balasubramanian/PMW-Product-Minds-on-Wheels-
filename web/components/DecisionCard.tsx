@@ -96,7 +96,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           <span>· {r.generated_by.startsWith("evidence-template") ? "Evidence-based draft · needs validation" : r.generated_by === "template" ? "Template draft" : "AI draft · needs validation"}</span>
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
-        <DecisionActions r={r} />
+        <DecisionActions key={`${r.id}:${r.updated_at}`} r={r} />
       </header>
 
       {r.challenged && (

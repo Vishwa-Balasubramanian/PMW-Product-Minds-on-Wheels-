@@ -33,7 +33,9 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
             for metric in ('priority', 'confidence'):
                 factors = json.loads(r[f'{metric}_factors'])
                 recomputed = score._weighted(factors, weights[metric])
-                if not 0 <= r[metric] <= 100 or (not r['challenged'] and r[metric] != recomputed):
+                expected = (json.loads(r['challenge'])['revised_confidence']
+                            if metric == 'confidence' and r['challenged'] else recomputed)
+                if not 0 <= r[metric] <= 100 or r[metric] != expected:
                     errors.append(f"{r['id']}: inconsistent {metric}")
             challenge = json.loads(r['challenge'])
             if not challenge.get('narrative'):
