@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from . import derive, evidence, score
+from . import derive, evidence, market_requirements, score
 from .config import RAW, SALES_FILE, STUDY_FILE, VEHICLES
 from .themes import THEME_VERSION, member_topics
 
@@ -61,6 +61,8 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
         for r in reqs:
             if r['kind'] == 'quick_win':
                 errors.extend(equipment_errors(con, r))
+            elif r['kind'] == 'market_conflict':
+                errors.extend(market_requirements.errors(con, r))
             else:
                 allowed = {row[0] for row in con.execute('SELECT feedback_id FROM signal_evidence WHERE signal_id=?', (r['signal_id'],))}
                 draft = {k: json.loads(r[k]) if k in ('assumptions', 'uncertainties') else r[k] for k in derive.FIELDS}
@@ -99,7 +101,8 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
             'comments': con.execute('SELECT COUNT(*) FROM feedback WHERE vehicle=?', (code,)).fetchone()[0],
             'labelled_comments_by_source': labels, 'unlabelled': unlabelled,
             'requirements': len(reqs), 'core_requirements': len(core),
-            'equipment_quick_wins': len(reqs) - len(core),
+            'equipment_quick_wins': len(quick_wins),
+            'market_conflict_requirements': sum(r['kind'] == 'market_conflict' for r in reqs),
             'core_quadrants': {q: sum(r['quadrant'] == q for r in core) for q in quadrants},
             'quadrants': quadrants, 'equipment_entries_best_effort': equipment,
             'draft_sources': sorted({r['generated_by'] for r in reqs}),

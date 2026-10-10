@@ -9,7 +9,7 @@ import json
 from collections import Counter
 import hashlib
 
-from . import aspects, challenge, db, derive, evidence, ingest, score, signals, verify
+from . import aspects, challenge, db, derive, evidence, ingest, market_requirements, score, signals, verify
 from .config import DB_PATH, MARKETS, VEHICLES
 from .themes import photo_topic
 
@@ -214,7 +214,7 @@ def build(args) -> None:
         evidence.build_conflicts(con, code)
         evidence.build_equipment_matches(con, code)
         n = build_requirements(con, code, args.top, args.llm, weights)
-        stats[code]["requirements"] = n
+        stats[code]["requirements"] = n + market_requirements.build(con, code, weights)
     con.commit()
     print(f"Database: {DB_PATH}")
     for code, s in stats.items():
