@@ -107,10 +107,32 @@ function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
     contradictions: r.contradictions.map((text) => text.split(" For example ")[0]) };
 }
 
+/**
+ * Equipment matches ("you already sell this") cite supporting comment IDs. Keep only the IDs from markets the viewer
+ * may see and record how many were removed, so restricted IDs never reach page or client component props.
+ * An ID that is not found in `feedback` counts as hidden.
+ */
+async function restrictMatchIds(viewer: Viewer, reqs: Requirement[]): Promise<Requirement[]> {
+  if (viewer.region === "ALL") return reqs;
+  const ids = [...new Set(reqs.flatMap((r) => r.already_exists.flatMap((m) => m.feedback_ids)))];
+  if (!ids.length) return reqs;
+  const rows = await all<{ id: string; market: string }>(`SELECT id, market FROM feedback WHERE id IN ${inList(ids)}`, ids);
+  const marketOf = new Map(rows.map((r) => [r.id, r.market]));
+  const visible = (id: string) => viewer.markets.includes(marketOf.get(id) as Market);
+  return reqs.map((r) => r.already_exists.length === 0 ? r : {
+    ...r,
+    already_exists: r.already_exists.map((m) => {
+      const keep = m.feedback_ids.filter(visible);
+      return { ...m, feedback_ids: keep, hidden_count: m.feedback_ids.length - keep.length };
+    }),
+  });
+}
+
 export async function listRequirements(viewer: Viewer, vehicle: string): Promise<Requirement[]> {
   const rows = await all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
-  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
+  const reqs = rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
     .map((r) => restrictRawEvidence(viewer, r));
+  return restrictMatchIds(viewer, reqs);
 }
 
 export async function getRequirementRow(id: string): Promise<Requirement | undefined> {
@@ -144,7 +166,7 @@ export async function getRequirement(viewer: Viewer, id: string): Promise<Requir
   const hidden: Record<string, number> = {};
   for (const q of allQuotes) if (!viewer.markets.includes(q.market as Market)) hidden[q.market] = (hidden[q.market] ?? 0) + 1;
   await logAccess(viewer, id, Object.keys(hidden).length > 0);
-  const requirement = restrictRawEvidence(viewer, req);
+  const [requirement] = await restrictMatchIds(viewer, [restrictRawEvidence(viewer, req)]);
   if (viewer.region !== "ALL") {
     const voice = quotes.find((q) => q.role === "supports");
     requirement.customer_voice = voice ? `“${voice.text.slice(0, 260)}” (${voice.id})` : null;
