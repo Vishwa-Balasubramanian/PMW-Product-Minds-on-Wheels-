@@ -72,6 +72,7 @@ class GenerationTests(unittest.TestCase):
 
     def test_numeric_claims_and_extra_score_rejected(self):
         for invalid in ({**self.data, 'priority': 99},
+                        {**self.data, 'root_cause': 'Hypothesis based on G70-0001 and G70-invented.'},
                         {**self.data, 'customer_need': 'Drivers need 90% reliability.'},
                         {**self.data, 'title': 'one two three four five six seven eight nine ten'}):
             with self.assertRaises(ValueError):

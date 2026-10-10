@@ -24,7 +24,7 @@ Return only the requested JSON. Never add scores, counts, percentages, prices,
 engineering targets or unsupported facts. Do not reproduce customer names.
 Only classification evidence spans may quote customer text.
 The product manager makes every final decision."""
-ID_RE = re.compile(r"\b(?:F70|G60|G68|G70)-\d{4,}\b")
+ID_RE = re.compile(r"\b(?:F70|G60|G68|G70)-[A-Za-z0-9]+\b")
 
 
 def canonical(value) -> str:

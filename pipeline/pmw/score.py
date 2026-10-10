@@ -31,7 +31,7 @@ FACTOR_LABELS = {
 
 # Topics likely to matter more by 2030. Marked as an assumption wherever used.
 FUTURE_TOPICS = ("eSIM", "Connected", "App", "CarPlay", "charging", "Range", "assistant", "Assistant",
-                 "Operating", "Touch screen", "Navigation", "Highway", "Driver assistance", "Remote")
+                 "Operating", "Touch screen", "Touchscreen", "Navigation", "Highway", "Driver assistance", "Remote")
 
 
 def _weighted(factors: dict, weights: dict) -> int:
