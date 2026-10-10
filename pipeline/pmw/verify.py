@@ -118,6 +118,12 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
     for row in con.execute('SELECT s.id FROM signals s LEFT JOIN signal_feedback f ON f.signal_id=s.id '
                            'GROUP BY s.id HAVING COUNT(f.feedback_id) != s.n_negative'):
         errors.append(f'{row[0]}: full negative-comment membership differs from the signal count')
+    if con.execute('SELECT 1 FROM signal_evidence e JOIN feedback_scope x ON x.feedback_id=e.feedback_id '
+                   'WHERE x.in_scope=0 LIMIT 1').fetchone():
+        errors.append('Text-excluded feedback leaked into requirement evidence')
+    if con.execute("SELECT 1 FROM equipment_matches m,json_each(m.feedback_ids) fid "
+                   "JOIN feedback_scope x ON x.feedback_id=fid.value WHERE x.in_scope=0 LIMIT 1").fetchone():
+        errors.append('Text-excluded feedback leaked into equipment matches')
     files = [SALES_FILE, STUDY_FILE] + [v[k] for v in VEHICLES.values() for k in ('feedback_file','options_file')]
     return {'passed': not errors, 'errors': errors, 'theme_version': THEME_VERSION, 'weights': weights,
             'data_sha256': {name: hashlib.sha256((RAW/name).read_bytes()).hexdigest() for name in sorted(files)},

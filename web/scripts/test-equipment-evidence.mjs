@@ -27,6 +27,7 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
         markets TEXT DEFAULT '["US","EU"]', customer_voice TEXT);
       CREATE TABLE feedback (id TEXT, vehicle TEXT, text TEXT, source TEXT, market TEXT, country TEXT, powertrain TEXT, severity TEXT);
       CREATE TABLE signal_evidence (signal_id TEXT, feedback_id TEXT, role TEXT);
+      CREATE TABLE feedback_scope (feedback_id TEXT,in_scope INTEGER,reason TEXT);
       CREATE TABLE signals (id TEXT, vehicle TEXT, n_negative INTEGER, in_scope INTEGER, by_market TEXT, by_source TEXT);
       CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE audit_events (ts TEXT, actor_type TEXT, actor TEXT, region TEXT, entity_type TEXT, entity_id TEXT,
@@ -38,6 +39,7 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
         ('unrelated','G60','The seat control broke','Source C','US',NULL,NULL,NULL),
         ('other-car','G70','A different vehicle','Source A','US',NULL,NULL,NULL);
       INSERT INTO signal_evidence VALUES ('S-G60-001','unrelated','supports');
+      INSERT INTO feedback_scope VALUES ('wish-us',0,'Pricing content'),('wish-eu',0,'Regulatory content');
       INSERT INTO requirements (id,vehicle,signal_id,kind,already_exists) VALUES ('R-main','G60','S-G60-001','signal','[]');
       INSERT INTO requirements (id,vehicle,signal_id,kind,already_exists) VALUES ('R-empty','G60','S-G60-001','quick_win','[]');
     `);
@@ -62,6 +64,9 @@ test("quick wins show their own wishes, preserve region restrictions, and do not
       },
     });
     const viewer = { region: "US", markets: ["US"], label: "United States", actor: "Test PM" };
+    assert.deepEqual(await gate.feedbackScope(viewer, 'G60'), [
+      { feedback_id: 'wish-us', in_scope: false, reason: 'Pricing content' },
+    ]);
     const view = await gate.getRequirement(viewer, "R-quick");
     assert.deepEqual(view.quotes.map((q) => q.id), ["wish-us"]);
     assert.equal(view.quotes[0].role, "supports");

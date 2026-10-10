@@ -35,6 +35,8 @@ export type Challenge = {
 
 export type LabelSource = "bmw" | "ai" | "rule";
 
+export type FeedbackScope = { feedback_id: string; in_scope: boolean; reason: string };
+
 export type Requirement = {
   id: string;
   vehicle: string;

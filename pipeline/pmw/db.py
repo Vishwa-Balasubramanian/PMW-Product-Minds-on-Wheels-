@@ -33,6 +33,13 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_vehicle ON feedback(vehicle, market);
 
+-- Raw comments and BMW labels stay untouched; text exclusions have readable reasons.
+CREATE TABLE IF NOT EXISTS feedback_scope (
+  feedback_id TEXT PRIMARY KEY,
+  in_scope INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
+
 -- One row per label: a comment can carry several (topic, type) labels.
 CREATE TABLE IF NOT EXISTS feedback_labels (
   feedback_id TEXT NOT NULL,
@@ -213,7 +220,7 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 PIPELINE_TABLES = [
-    "vehicles", "feedback", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
+    "vehicles", "feedback", "feedback_scope", "feedback_labels", "survey_scores", "sales", "equipment", "equipment_matches",
     "data_issues", "representation", "market_conflicts", "signals", "signal_evidence", "signal_feedback",
     "requirements", "audit_events", "settings",
 ]
