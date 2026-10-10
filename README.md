@@ -1,4 +1,4 @@
-# Product Mind on Wheels (PMW)
+# Product Minds on Wheels (PMW)
 
 AI decision support for BMW product managers: from customer evidence to traceable, prioritised requirements for
 the next vehicle generation, with the product manager deciding every step. EHL Grand Finale 2026, BMW track.

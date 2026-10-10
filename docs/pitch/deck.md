@@ -3,7 +3,7 @@
 BMW challenge "AI for Product Decision Making", EHL Grand Finale 2026. Pitch lead: Gokul.
 Demo click path: [demo-script.md](demo-script.md). Judge questions: [qa.md](qa.md).
 
-> **Project name:** Product Mind on Wheels (PMW).
+> **Project name:** Product Minds on Wheels (PMW).
 
 **How to read this file.** One block per slide: title, the one message, what is on screen, what to say.
 Every number was checked against a fresh `uv run pmw build` of `main` (2381fb1) on 11 October 2026.
@@ -68,7 +68,7 @@ Verified:
 - Three cars, four markets: 1 Series, 5 Series, 7 Series · US, Europe, China, Rest of World
 
 **Speaker notes**
-Product Mind on Wheels (PMW) reads all of BMW's files and builds this ladder for every requirement: what
+Product Minds on Wheels (PMW) reads all of BMW's files and builds this ladder for every requirement: what
 customers said, the pattern behind it, a root-cause hypothesis, the customer need and a testable requirement.
 Then two separate scores: how important, and how well proven. The product manager approves, edits, rejects or
 challenges. Every step lands in an audit trail. Let me show you.

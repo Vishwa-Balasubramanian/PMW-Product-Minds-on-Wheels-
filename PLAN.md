@@ -66,8 +66,7 @@ Customer voice → Signal → Root cause → Customer need → Requirement → P
 - Hosted at https://product-minds-on-wheels.vercel.app (Turso database, not indexed, no trackers).
 
 **Open decisions**
-- Name in the docs: the app now says "Product Manager's Workbench"; this file, README and the briefs say
-  "Product Minds on Wheels".
+- Name: decided on 11 October: **Product Minds on Wheels (PMW)**, everywhere in the app and the docs.
 - BMW logo: add `web/public/brand/bmw-logo.svg` and confirm the organizers allow it on a public prototype.
 
 ## 5a. Phase 2 split

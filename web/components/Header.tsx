@@ -10,7 +10,7 @@ export function Wordmark() {
       <span className="text-[22px] font-bold uppercase tracking-[0.02em] leading-none">
         <span className="pmw-p text-blue">P</span><span>MW</span>
       </span>
-      <span className="hidden text-[12px] font-light text-ink-3 sm:inline">Product Mind on Wheels</span>
+      <span className="hidden text-[12px] font-light text-ink-3 sm:inline">Product Minds on Wheels</span>
     </Link>
   );
 }
