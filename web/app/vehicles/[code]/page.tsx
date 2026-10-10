@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { Header } from "@/components/Header";
 import { ScrollToCard } from "@/components/ScrollToCard";
+import { WeightsPanel } from "@/components/WeightsPanel";
 import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
-  auditFor, dataIssues, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
-  marketConflicts, missingVoices, representation, vehicleTotals,
+  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
+  marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
 } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
+import { PRIORITY_FACTORS, factorValues, presetLabel, type PriorityWeights } from "@/lib/score";
 import { QUADRANT, type Quadrant } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +34,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   // List filter: a quadrant, or "quick" for quick wins (equipment BMW already sells).
   const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
-  const [all, weights, voices, totals, labels] = await Promise.all([
-    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(),
+  const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
+    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(),
+    storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
   const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
@@ -86,6 +89,18 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
       </nav>
 
       <div className="container-x py-8">
+        {view === "inbox" && (
+          <div className="mb-6">
+            {/* Factor values, IDs and titles only: no customer text reaches this client component. */}
+            <WeightsPanel
+              items={[...all].sort((a, b) => stored.indexOf(a.id) - stored.indexOf(b.id))
+                .map((r) => ({ id: r.id, title: r.title, values: factorValues(r.priority_factors) }))}
+              labels={Object.fromEntries(PRIORITY_FACTORS.map((k) => [k, labels[k] ?? k]))}
+              defaults={weights.priority as PriorityWeights}
+              active={active ? { priority: active.priority, preset: active.preset } : null}
+            />
+          </div>
+        )}
         {view === "inbox" && <Inbox />}
         {view === "matrix" && (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_1fr]">
@@ -138,6 +153,12 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
             </Link>
           </div>
+          {active && (
+            <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
+              <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
+              <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+            </p>
+          )}
           <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
             <h2 className="whitespace-nowrap text-[15px] font-semibold">Ranked by priority</h2>
             <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
