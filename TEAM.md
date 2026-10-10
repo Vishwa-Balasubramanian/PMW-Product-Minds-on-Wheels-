@@ -1,5 +1,7 @@
 # Team plan
 
+The overall plan, decisions and demo story: [PLAN.md](PLAN.md).
+
 **AI agent briefs:** [Vishwa](docs/agent-briefs/VISHWA_AGENT_BRIEF.md) · [Arjun](docs/agent-briefs/ARJUN_AGENT_BRIEF.md).
 Give your agent the brief and ask it to do one task at a time, on a branch, ending in a pull request.
 
