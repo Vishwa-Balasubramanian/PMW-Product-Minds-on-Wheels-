@@ -35,6 +35,7 @@ test("live happiness deduplicates signals, follows approvals, respects regions a
     const all = async (sql, args) => (await client.execute({ sql, args })).rows;
     const { happiness } = loadTs('../lib/gate.ts', {
       'next/headers': {}, './regions': loadTs('../lib/regions.ts'), './db': { all },
+      './score': loadTs('../lib/score.ts'),
     });
     const viewer = { region: 'ALL', markets: ['US', 'EU', 'CN', 'ROW'] };
     let rows = await happiness(viewer, 'G70');
