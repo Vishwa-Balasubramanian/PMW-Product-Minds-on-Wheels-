@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { Header } from "@/components/Header";
+import { ScrollToCard } from "@/components/ScrollToCard";
 import { MOSCOW, Matrix, QuadrantBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
@@ -120,6 +121,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               <Link
                 key={q ?? "all"}
                 href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
+                scroll={false}
                 className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === q ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink"}`}
               >
                 {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
@@ -149,6 +151,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                         <li key={r.id}>
                           <Link
                             href={`/vehicles/${code}?${qFilter ? `q=${qFilter}&` : ""}req=${r.id}`}
+                            scroll={false}
                             aria-label={`${m.label}, priority ${r.priority}: ${r.title}`}
                             className={`relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 py-2.5 pr-3 pl-7 ${on ? "bg-monitor-soft shadow-[inset_3px_0_0_var(--color-blue)]" : "hover:bg-mist"}`}
                           >
@@ -170,7 +173,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             })}
           </div>
         </aside>
-        <div className="min-w-0">
+        <div id="decision-card" className="min-w-0 scroll-mt-[145px]">
+          {detail && <ScrollToCard targetId="decision-card" selected={detail.requirement.id} />}
           {detail ? (
             <DecisionCard
               r={detail.requirement}
