@@ -330,3 +330,55 @@ export async function vehicleTotals(vehicle: string) {
   ]);
   return { comments, unlabelled, signals, outOfScope };
 }
+
+// ---------- workflow ----------
+
+export type WorkflowStats = {
+  comments: number;
+  surveyRows: number;
+  equipmentRows: number;
+  dataIssues: number;
+  labelledByRules: number;
+  signals: number;
+  outOfScope: number;
+  conflicts: number;
+  equipmentMatches: number;
+  requirements: number;
+  quickWins: number;
+  drafts: Record<string, number>; // generated_by -> count
+  quadrants: Record<string, number>;
+  decided: number;
+  awaiting: number;
+  auditEvents: number;
+  pmEvents: number;
+};
+
+/** Live totals for the workflow page. Aggregates only, no customer text, so the same for every region. */
+export async function workflowStats(): Promise<WorkflowStats> {
+  const [comments, surveyRows, equipmentRows, dataIssues, labelledByRules, signals, outOfScope, conflicts, equipmentMatches,
+    requirements, quickWins, decided, awaiting, auditEvents, pmEvents] = await Promise.all([
+    n("SELECT COUNT(*) n FROM feedback", []),
+    n("SELECT COUNT(*) n FROM survey_scores", []),
+    n("SELECT COUNT(*) n FROM equipment", []),
+    n("SELECT COUNT(*) n FROM data_issues", []),
+    n("SELECT COUNT(DISTINCT feedback_id) n FROM feedback_labels WHERE label_source <> 'bmw'", []),
+    n("SELECT COUNT(*) n FROM signals", []),
+    n("SELECT COUNT(*) n FROM signals WHERE in_scope = 0", []),
+    n("SELECT COUNT(*) n FROM market_conflicts WHERE in_scope = 1", []),
+    n("SELECT COUNT(*) n FROM equipment_matches", []),
+    n("SELECT COUNT(*) n FROM requirements", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE kind = 'quick_win'", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE status IN ('approved','rejected','validate')", []),
+    n("SELECT COUNT(*) n FROM requirements WHERE status IN ('proposed','edited')", []),
+    n("SELECT COUNT(*) n FROM audit_events", []),
+    n("SELECT COUNT(*) n FROM audit_events WHERE actor_type = 'pm'", []),
+  ]);
+  const drafts = Object.fromEntries(
+    (await all<{ g: string; n: number }>("SELECT generated_by g, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.g, Number(r.n)]),
+  );
+  const quadrants = Object.fromEntries(
+    (await all<{ q: string; n: number }>("SELECT quadrant q, COUNT(*) n FROM requirements GROUP BY 1")).map((r) => [r.q, Number(r.n)]),
+  );
+  return { comments, surveyRows, equipmentRows, dataIssues, labelledByRules, signals, outOfScope, conflicts, equipmentMatches,
+    requirements, quickWins, drafts, quadrants, decided, awaiting, auditEvents, pmEvents };
+}

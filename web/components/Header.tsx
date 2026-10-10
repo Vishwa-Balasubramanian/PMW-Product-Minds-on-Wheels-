@@ -19,6 +19,7 @@ const NAV = [
   { href: "/vehicles/G70", label: "7 Series" },
   { href: "/vehicles/G60", label: "5 Series" },
   { href: "/vehicles/F70", label: "1 Series" },
+  { href: "/workflow", label: "Workflow" },
   { href: "/audit", label: "Audit trail" },
 ];
 
