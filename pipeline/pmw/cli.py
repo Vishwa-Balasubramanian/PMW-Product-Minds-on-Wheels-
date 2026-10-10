@@ -210,6 +210,7 @@ def build(args) -> None:
             "SELECT COUNT(*) FROM feedback f WHERE vehicle=? AND NOT EXISTS "
             "(SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL)", (code,)).fetchone()[0]
         signals.build(con, code)
+        evidence.record_survey_coverage(con, code, args.top)
         evidence.build_representation(con, code)
         evidence.build_conflicts(con, code)
         evidence.build_equipment_matches(con, code)

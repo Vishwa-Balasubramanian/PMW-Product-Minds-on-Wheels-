@@ -5,7 +5,7 @@ import type { InStatement } from "@libsql/client";
 import { cookies } from "next/headers";
 import { all, nowIso, one, parse, writeBatch } from "./db";
 import { DEFAULT_REGION, MARKET_LABEL, MARKETS, REGIONS, REGION_COOKIE, isRegion, marketsFor, type Market, type RegionCode } from "./regions";
-import type { AuditEvent, Quote, Requirement, Signal, Weights } from "./types";
+import type { AuditEvent, FeedbackScope, Quote, Requirement, Signal, Weights } from "./types";
 
 export type Viewer = { region: RegionCode; markets: Market[]; label: string; actor: string };
 
@@ -264,6 +264,16 @@ export async function auditLog(opts: { vehicle?: string; limit?: number } = {}):
 }
 
 // ---------- vehicle-level evidence ----------
+
+/** Text-scope flags, with IDs restricted to the viewer's markets. Original text is not returned. */
+export async function feedbackScope(viewer: Viewer, vehicle: string): Promise<FeedbackScope[]> {
+  if (!viewer.markets.length) return [];
+  const rows = await all<{ feedback_id: string; in_scope: number; reason: string }>(
+    `SELECT x.feedback_id,x.in_scope,x.reason FROM feedback_scope x JOIN feedback f ON f.id=x.feedback_id
+     WHERE f.vehicle=? AND f.market IN ${inList(viewer.markets)} ORDER BY x.feedback_id`, [vehicle, ...viewer.markets],
+  );
+  return rows.map((row) => ({ ...row, in_scope: Boolean(row.in_scope) }));
+}
 
 export async function getWeights(): Promise<Weights> {
   const r = await one<{ value: string }>("SELECT value FROM settings WHERE key = 'weights'");

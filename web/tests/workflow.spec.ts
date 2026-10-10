@@ -5,6 +5,16 @@ import path from 'node:path';
 const testDb = path.resolve('..', 'db', 'pmw-smoke-run.sqlite');
 const db = () => new DatabaseSync(testDb, { readOnly: true });
 
+test('data health explains text exclusions and deliberate survey gaps', async ({ page, context }) => {
+  await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
+  await page.goto('/vehicles/G60?view=data');
+  await expect(page.getByText(/comments flagged:/).first()).toBeVisible();
+  await expect(page.getByText(/No survey evidence for/).first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/scope-data-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.screenshot({ path: 'test-results/scope-data-mobile.png', fullPage: true });
+});
+
 test('equipment quick win displays only its matching wishing comments', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const con = db();

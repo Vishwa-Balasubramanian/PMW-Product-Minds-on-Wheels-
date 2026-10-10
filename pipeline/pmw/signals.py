@@ -43,6 +43,7 @@ def classify_unlabelled(con, vehicle: str, use_llm: bool = False) -> int:
     """Keep BMW labels intact; record AI and conservative rule labels separately."""
     comments = [dict(r) for r in con.execute(
         "SELECT f.id, f.text FROM feedback f WHERE f.vehicle=? AND f.classified=0 "
+        "AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=f.id AND x.in_scope=0) "
         "AND NOT EXISTS (SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL) "
         "ORDER BY f.id", (vehicle,))]
     topics = {r[0] for r in con.execute(
@@ -87,7 +88,9 @@ def build(con, vehicle: str) -> list[str]:
         """SELECT f.id, f.source, f.market, f.text, f.severity, f.competitors,
                   l.feedback_type, l.topic, l.subtopic
            FROM feedback f JOIN feedback_labels l ON l.feedback_id = f.id
-           WHERE f.vehicle = ? AND l.topic IS NOT NULL ORDER BY f.id, l.topic, l.feedback_type""", (vehicle,)).fetchall()
+           WHERE f.vehicle = ? AND l.topic IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM feedback_scope x WHERE x.feedback_id=f.id AND x.in_scope=0)
+           ORDER BY f.id, l.topic, l.feedback_type""", (vehicle,)).fetchall()
 
     by_topic: dict[str, dict[str, dict]] = defaultdict(dict)
     for r in rows:
