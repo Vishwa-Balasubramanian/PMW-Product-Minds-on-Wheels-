@@ -19,9 +19,13 @@ test('equipment quick win displays only its matching wishing comments', async ({
     await expect(page.getByRole('heading', { name: r.title, exact: true })).toBeVisible();
     await expect(page.getByText(/Make ventilated front seats available on the successor/)).toBeVisible();
     expect(r.title).toContain('7VB');
+    await expect(page.locator('article img').first()).toHaveAttribute('alt', 'Seats');
     const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
     const shownIds = await evidence.locator('li .font-mono').allTextContents();
     expect(shownIds.sort()).toEqual(ids);
+    await page.screenshot({ path: 'test-results/requirement-photo-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: 'test-results/requirement-photo-mobile.png', fullPage: true });
   } finally { con.close(); }
 });
 

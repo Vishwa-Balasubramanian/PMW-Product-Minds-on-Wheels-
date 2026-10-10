@@ -130,8 +130,7 @@ def build_quick_wins(con, vehicle: str, limit: int = 5, *, weights: dict | None 
         # Keep a topic link for navigation; all evidence and scores below belong to this feature.
         matches.sort(key=lambda m: (-len(m["feedback_ids"]), m["signal_or_requirement_id"], m["code"] or "", m["source_vehicle"]))
         representative = matches[0]
-        topic = con.execute("SELECT topic FROM signals WHERE id=?", (representative["signal_or_requirement_id"],)).fetchone()[0]
-        a = aspects.for_topic(vehicle, photo_topic(topic))
+        a = aspects.for_topic(vehicle, feature)
         standard = next((m for m in matches if m["match_type"] == "standard_other_vehicle"), None)
         packaged = next((m for m in matches if m["match_type"] == "package_same_vehicle"), None)
         option = next((m for m in matches if m["match_type"] == "option_same_vehicle"), None)
