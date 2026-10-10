@@ -115,6 +115,9 @@ def inspect(con, expected_per_vehicle: int = 15) -> dict:
         }
     if con.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
         errors.append('SQLite integrity check failed')
+    for row in con.execute('SELECT s.id FROM signals s LEFT JOIN signal_feedback f ON f.signal_id=s.id '
+                           'GROUP BY s.id HAVING COUNT(f.feedback_id) != s.n_negative'):
+        errors.append(f'{row[0]}: full negative-comment membership differs from the signal count')
     files = [SALES_FILE, STUDY_FILE] + [v[k] for v in VEHICLES.values() for k in ('feedback_file','options_file')]
     return {'passed': not errors, 'errors': errors, 'theme_version': THEME_VERSION, 'weights': weights,
             'data_sha256': {name: hashlib.sha256((RAW/name).read_bytes()).hexdigest() for name in sorted(files)},
