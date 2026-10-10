@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Design tokens. Visual language follows bmw.de: photography first, light body type,
+   uppercase bold headlines, square buttons, one blue. Change colours here, not in components. */
+@theme {
+  --font-sans: "Albert Sans", Arial, Helvetica, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-blue: #1c69d4;
+  --color-blue-dark: #0653b6;
+  --color-ink: #262626;
+  --color-ink-2: #4d4d4d;
+  --color-ink-3: #8e8e8e;
+  --color-line: #e4e4e4;
+  --color-mist: #f5f5f5;
+  --color-night: #0d0f12;
+
+  --color-act: #1f7a4d;
+  --color-act-soft: #e3f2ea;
+  --color-validate: #b86e00;
+  --color-validate-soft: #fbf0dc;
+  --color-monitor: #1c69d4;
+  --color-monitor-soft: #e6effb;
+  --color-park: #6f6f6f;
+  --color-park-soft: #efefef;
+  --color-must: #c4302b;
+  --color-should: #d9730d;
+  --color-could: #1c69d4;
+  --color-wont: #8e8e8e;
+
+  --color-danger: #c4302b;
+  --color-danger-soft: #fbe7e6;
+
+  --animate-rise: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-settle: settle 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes settle {
+  from { transform: scale(1.08); }
+  to { transform: scale(1); }
+}
+
+html { color-scheme: light; }
+body {
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+b, strong { font-weight: 600; }
+:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Reusable pieces (Tailwind v4 custom utilities, usable in class names and @apply). */
+@utility headline { text-transform: uppercase; font-weight: 700; letter-spacing: 0.01em; line-height: 1.05; }
+@utility eyebrow { text-transform: uppercase; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: var(--color-ink-3); }
+@utility btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  height: 3rem; padding-inline: 1.5rem; font-size: 15px; font-weight: 500; cursor: pointer;
+  transition: background-color .2s, color .2s, border-color .2s;
+  &:disabled { cursor: not-allowed; opacity: .5; }
+}
+@utility btn-primary { @apply btn bg-blue text-white hover:bg-blue-dark; }
+@utility btn-outline { @apply btn border border-ink bg-white text-ink hover:bg-ink hover:text-white; }
+@utility btn-ghost-light { @apply btn border border-white/70 text-white hover:bg-white hover:text-ink; }
+@utility btn-sm { height: 2.5rem; padding-inline: 1rem; font-size: 14px; }
+@utility container-x { margin-inline: auto; width: 100%; max-width: 1440px; padding-inline: 1rem; @media (width >= 40rem) { padding-inline: 2rem; } @media (width >= 64rem) { padding-inline: 3rem; } }
