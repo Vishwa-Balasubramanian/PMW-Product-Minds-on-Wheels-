@@ -51,3 +51,35 @@ class SurveyCoverageTests(unittest.TestCase):
         self.assertEqual(evidence.survey_for_topic(con, 'G70', 'Rear seat entertainment'), [])
         self.assertIn('Rear seat entertainment', evidence.SURVEY_COVERAGE_GAPS)
         self.assertEqual(evidence.survey_for_topic(con, 'F70', 'Exterior'), [])
+
+
+class MixedCommentScopeTests(unittest.TestCase):
+    def test_mixed_comment_keeps_product_content(self):
+        con = sqlite3.connect(':memory:')
+        con.row_factory = sqlite3.Row
+        self.addCleanup(con.close)
+        con.executescript(db.SCHEMA)
+        rows = [('mixed', 'Rear seats do not recline far enough. Headrests are uncomfortable.\nprice is too high.'),
+                ('pure', 'The price is too high.'),
+                ('product', 'Rear seats do not recline far enough.')]
+        for fid, text in rows:
+            con.execute("INSERT INTO feedback VALUES (?,'G70','Source A','US','US',NULL,?,NULL,NULL,1)", (fid, text))
+            con.execute("INSERT INTO feedback_labels VALUES (?,'Difficult to Use','Seats',NULL,'bmw')", (fid,))
+        scope.apply_text_scope(con)
+        flags = {r['feedback_id']: (r['in_scope'], r['reason']) for r in con.execute('SELECT * FROM feedback_scope')}
+        self.assertEqual(flags['pure'][0], 0)
+        self.assertEqual(flags['mixed'][0], 1)
+        self.assertIn('Only the product content', flags['mixed'][1])
+        self.assertNotIn('product', flags)
+        signals.build(con, 'G70')
+        self.assertEqual(con.execute('SELECT n_negative FROM signals').fetchone()[0], 2)
+        ids = {r[0] for r in con.execute('SELECT feedback_id FROM signal_evidence')}
+        self.assertEqual(ids, {'mixed', 'product'})
+
+    def test_price_bracket_is_background_and_clauses_split(self):
+        self.assertEqual(scope.text_scope('a bmw in the lower price bracket that is put together well'), (True, None))
+        self.assertFalse(scope.text_scope('please lower the price')[0])
+        parts = scope.sentences('no response about the oil leak, plus there is pressure toward a discount deal.')
+        self.assertEqual(len(parts), 2)
+        self.assertEqual([scope.text_scope(p)[0] for p in parts], [True, False])
+
