@@ -1,5 +1,8 @@
 # Team plan
 
+**AI agent briefs:** [Vishwa](docs/agent-briefs/VISHWA_AGENT_BRIEF.md) · [Arjun](docs/agent-briefs/ARJUN_AGENT_BRIEF.md).
+Give your agent the brief and ask it to do one task at a time, on a branch, ending in a pull request.
+
 Three people, three lanes, one shared contract. Each lane owns its files, so we rarely touch the same file.
 
 ## The contract (change only together)
