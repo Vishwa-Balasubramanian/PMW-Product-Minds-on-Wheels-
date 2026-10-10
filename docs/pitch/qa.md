@@ -1,6 +1,6 @@
 # PMW judge Q&A
 
-Ten likely questions with short, honest answers. Each answer matches `main` (4ef88d2) as of 11 October 2026.
+Ten likely questions with short, honest answers. Each answer matches `main` (2381fb1) as of 11 October 2026.
 Where something is not built, the answer says so. Deck: [deck.md](deck.md). Demo: [demo-script.md](demo-script.md).
 Scoring detail will live in Vishwa's `docs/pitch/scoring.md`, data traps in Arjun's `docs/pitch/data-traps.md`
 (neither written yet).
@@ -94,12 +94,13 @@ layouts, so new layouts need new checks.
 A market product manager sees raw comments from their own market only; other markets show as counts ("49 comments
 from United States restricted"). Scores and survey summaries stay visible to everyone. The head of product (All
 markets) sees everything. The filtering happens on the server, so restricted text is not sent to the browser, and
-every view of evidence with restricted markets is logged. The export follows the same rule. The hosted site is not
+every view of evidence with restricted markets is logged. The export, the "You already sell this" banner and the
+audit trail follow the same rule: comment IDs from other markets are removed or replaced. The hosted site is not
 indexed, has no trackers and loads no third-party fonts or scripts. Limits: in the prototype the region is a cookie
 anyone can change, which stands in for single sign-on. In AI mode, comment text would go to the model provider;
 in production that would have to run in a BMW-approved environment.
 
-<!-- web/lib/gate.ts getRequirement(), restrictRawEvidence(), logAccess(), exportBundle(). web/lib/regions.ts.
+<!-- web/lib/gate.ts getRequirement(), restrictRawEvidence(), restrictMatchIds(), redactAuditIds(), logAccess(), exportBundle(). web/lib/regions.ts.
      README "Hosted demo" (robots meta, robots.txt, X-Robots-Tag, self-hosted font).
      derive.py generate(): up to 15 supporting and 5 positive comments per signal in the AI payload. -->
 
@@ -129,9 +130,10 @@ the scoring engine's. The product manager cannot type in a score either: scores 
 It is a lead for the product manager, not a verdict. A match needs a customer comment labelled as a wish on the
 right topic, with wording that matches a German price-list row; complaints about standard equipment are kept
 separately as "standard but failing". Each match keeps its comment IDs and the price-list line, so it can be
-checked in seconds. The price-list parser has six checks against known codes and prices. It is word matching, so
-it can pick the wrong package: on the 7 Series "ventilated front seats" points to the Executive Paket, which holds
-rear-seat ventilation. We found that ourselves and it is flagged for a fix.
+checked in seconds; the banner on the card shows the original German equipment row. The price-list parser has six
+checks against known codes and prices. It is word matching, so it can pick the wrong package: the 7 Series quick win
+title for "ventilated front seats" names the Executive Paket, which holds rear-seat ventilation. The banner shows
+both rows, rear and front, so a product manager would catch it. We found it ourselves and it is flagged for a fix.
 
 <!-- pipeline/pmw/evidence.py build_equipment_matches(): Wants -> option/package/standard_other_vehicle,
      Difficult to Use/Defect -> standard_but_failing. 

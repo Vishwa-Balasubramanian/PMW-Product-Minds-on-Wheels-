@@ -7,7 +7,7 @@ Requirement IDs are hashes (for example `R-G70-30fddc4c00`), so this script uses
 twice in the 7 Series list ("Seats that adapt to everyday comfort needs", "Doors and access that behave
 predictably"); the demo avoids both.
 
-Every expected value below was checked on a fresh build of `main` (4ef88d2) with the app running locally,
+Every expected value below was checked on a fresh build of `main` (2381fb1) with the app running locally,
 by running the same challenge, edit and approve through the app's API. Queries are in HTML comments.
 
 ## Before going on stage
@@ -45,15 +45,20 @@ by running the same challenge, edit and approve through the app's API. Queries a
 | 1:48 | Header **WORKFLOW**. | "BMW's deliverable three: what runs automatically and where a person must decide." | Six automatic steps (Code or AI · drafts only), then the dark step 7 "The product manager decides" (mandatory), step 8 "Record". "1 requirements decided", "54 awaiting a decision". |
 | 1:55 | Header **7 SERIES** → **Export CSV** (top right of the tab bar). | "And the requirement list in BMW's format, filtered to what this region may see, and logged." | Download `pmw-requirements-G70-CN-<date>.csv` with 10 requirements (date is UTC). Comment text from other markets is restricted. |
 
-Optional, only if ahead of time: in the 7 Series list (United States), **Could have** group, open
-**Offer massage seats outside €4,450 Executive Paket (9DA)**: 8 customer comments ask for massage seats; rear
-massage sits in the €4,450 Executive Paket. Do not open "Offer ventilated front seats outside €4,450 Executive
-Paket (9DA)": 9DA holds rear seat ventilation, so that title is wrong (flagged to Arjun). Also note the card line
-on quick wins currently reads "AI draft · needs validation", although they come from the equipment matcher, not
-an AI model (flagged; `DecisionCard.tsx`).
+**Optional, only if ahead of time (about 15 seconds), before switching to China:** above the list, click the blue
+**Quick wins 2** chip, then **Offer massage seats outside €4,450 Executive Paket (9DA)**. Say: "Eight customers ask
+for massage seats. BMW already sells them." The blue "You already sell this" banner reads: "Only inside the
+Executive Paket (9DA, €4,450) on the 7 Series, listed as Massagefunktion im Fond" and "Only inside the Connoisseur
+Paket (9DC, €3,200) on the 7 Series, listed as Massagefunktion vorn", with customer comments G70-0693, G70-1056,
+G70-1817 and more. Click **All** to return to the full list.
+
+Avoid on stage: "Offer ventilated front seats outside €4,450 Executive Paket (9DA)". Its title names the rear-seat
+package; front ventilation is in the Connoisseur Paket (9DC, €3,200). The banner on that card lists both rows, but
+the title is wrong (flagged to Arjun). Also note that quick-win cards read "AI draft · needs validation", although
+they come from the equipment matcher, not an AI model (flagged; `DecisionCard.tsx`).
 
 <!--
-Expected values, fresh build of main 4ef88d2:
+Expected values, fresh build of main 2381fb1:
   Home lane (US): SELECT feedback_n FROM representation WHERE vehicle='G70' AND market='US';  -> 3792
                   SELECT volume FROM sales WHERE vehicle='G70' AND market='US' AND year=2025;   -> 12000
                   SELECT COUNT(*) FROM requirements WHERE vehicle='G70';                         -> 17
@@ -77,7 +82,7 @@ Expected values, fresh build of main 4ef88d2:
 
 | Problem | Do this |
 |---|---|
-| The demo requirement already shows **Challenged** | Use **Comfortable cabin with understandable climate controls** (Should have, priority 62): challenge moves confidence **71 → 51**, Act → Validate first. Say the numbers from the screen. |
+| The demo requirement already shows **Challenged** | Use **Comfortable cabin with understandable climate controls** (Should have, priority 62): challenge moves confidence **71 → 51**, Act → Validate first. Say the numbers from the screen. This card also shows a "You already sell this" banner for ventilated seats; mention it in one sentence or skip it. |
 | A page takes more than 5 seconds | Say "cold start", switch to the local tab (below), continue from the same step. |
 | A click returns an error | Switch to the local tab. Do not retry more than once on stage. |
 | Region switch shows "Switching…" for long | Reload the page; the cookie is already set. |

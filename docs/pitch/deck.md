@@ -7,7 +7,7 @@ Demo click path: [demo-script.md](demo-script.md). Judge questions: [qa.md](qa.m
 > The team still has to confirm the final name before the slides are designed.
 
 **How to read this file.** One block per slide: title, the one message, what is on screen, what to say.
-Every number was checked against a fresh `uv run pmw build` of `main` (4ef88d2) on 11 October 2026.
+Every number was checked against a fresh `uv run pmw build` of `main` (2381fb1) on 11 October 2026.
 The query behind each number sits in an HTML comment under the slide (`sqlite3 db/pmw.sqlite`).
 Numbers change if the pipeline changes: rerun the queries after the last merge and before designing the slides.
 
@@ -182,8 +182,8 @@ Challenge:
   Quadrant after challenge: priority 69 >= 55, confidence 44 < 58 -> validate (web/lib/actions.ts quadrantFor).
 Do NOT use the 7 Series "ventilated front seats ... Executive Paket (9DA)" quick win: 9DA holds REAR ventilation;
 front ventilation is in the Connoisseur Paket (9DC, €3,200). Flagged to Arjun.
-The "You already sell this" banner on the Decision Card (task G2) is not built yet; quick wins currently show as
-their own requirements in the list.
+In the app (since PR #10): "Quick wins" filter chip in the requirement list (7 Series: 2) and a "You already sell
+this" banner on the Decision Card, listing every matching equipment row with code, price and comment IDs.
 -->
 
 ---
