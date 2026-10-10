@@ -24,19 +24,18 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 export default async function VehiclePage({ params, searchParams }: PageProps<"/vehicles/[code]">) {
   const { code } = await params;
   const sp = await searchParams;
-  const vehicle = getVehicle(code);
+  const vehicle = await getVehicle(code);
   if (!vehicle) notFound();
   const viewer = await getViewer();
   const view = (typeof sp.view === "string" ? sp.view : "inbox") as (typeof VIEWS)[number]["k"];
   const qFilter = typeof sp.q === "string" ? (sp.q as Quadrant) : null;
 
-  const all = listRequirements(viewer, code);
+  const [all, weights, voices, totals, labels] = await Promise.all([
+    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(),
+  ]);
   const reqs = qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
   const selectedId = typeof sp.req === "string" ? sp.req : reqs[0]?.id;
-  const weights = getWeights();
-  const voices = missingVoices(code);
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
-  const totals = vehicleTotals(code);
 
   return (
     <main className="flex-1 bg-white">
@@ -104,8 +103,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     </main>
   );
 
-  function Inbox() {
-    const detail = selectedId ? getRequirement(viewer, selectedId) : undefined;
+  async function Inbox() {
+    const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
+    const events = detail ? await auditFor(detail.requirement.id) : [];
     return (
       <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="flex flex-col gap-3 lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:self-start">
@@ -170,8 +170,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               r={detail.requirement}
               quotes={detail.quotes}
               hidden={detail.hidden}
-              events={auditFor(detail.requirement.id)}
-              labels={getFactorLabels()}
+              events={events}
+              labels={labels}
               thresholds={weights.thresholds}
               viewer={viewer}
               siblings={all}
@@ -184,8 +184,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     );
   }
 
-  function Signals() {
-    const signals = listSignals(code);
+  async function Signals() {
+    const signals = await listSignals(code);
     return (
       <Section title={`${signals.length} signals · ${totals.outOfScope} excluded by the scope guard · ${totals.unlabelled} comments still unlabelled`}>
         <div className="overflow-x-auto">
@@ -224,10 +224,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     );
   }
 
-  function DataHealth() {
-    const rep = representation(code);
-    const conflicts = marketConflicts(code);
-    const issues = dataIssues(code);
+  async function DataHealth() {
+    const [rep, conflicts, issues] = await Promise.all([representation(code), marketConflicts(code), dataIssues(code)]);
     const sev: Record<string, string> = { critical: "bg-danger text-white", warning: "bg-validate-soft text-validate", info: "bg-mist text-ink-2" };
     return (
       <div className="grid gap-6 xl:grid-cols-2">

@@ -1,6 +1,8 @@
-// PM decisions. Every change writes an audit event with who, when, before, after and why.
-import { db, nowIso } from "./db";
-import { getRequirementRow, getWeights, logEvent, type Viewer } from "./gate";
+// PM decisions. Every change writes an audit event with who, when, before, after and why,
+// in the same atomic batch as the change itself.
+import type { InStatement } from "@libsql/client";
+import { nowIso, writeBatch } from "./db";
+import { auditStatement, getRequirementRow, getWeights, type Viewer } from "./gate";
 import type { Quadrant, Status } from "./types";
 
 export type Action = "approve" | "reject" | "validate" | "edit" | "challenge" | "reopen";
@@ -13,16 +15,17 @@ export type ActionInput = {
 };
 
 const NEEDS_RATIONALE: Action[] = ["reject", "validate", "edit"];
+const EDITABLE: EditableField[] = ["title", "requirement", "customer_need"];
 
-export function quadrantFor(priority: number, confidence: number): Quadrant {
-  const t = getWeights().thresholds;
+export async function quadrantFor(priority: number, confidence: number): Promise<Quadrant> {
+  const t = (await getWeights()).thresholds;
   const hp = priority >= t.priority;
   const hc = confidence >= t.confidence;
   return hp && hc ? "act" : hp ? "validate" : hc ? "monitor" : "park";
 }
 
-export function applyAction(viewer: Viewer, id: string, input: ActionInput): { ok: true } | { ok: false; error: string } {
-  const req = getRequirementRow(id);
+export async function applyAction(viewer: Viewer, id: string, input: ActionInput): Promise<{ ok: true } | { ok: false; error: string }> {
+  const req = await getRequirementRow(id);
   if (!req) return { ok: false, error: "Requirement not found." };
   if (!req.markets.some((m) => viewer.markets.includes(m as never))) {
     return { ok: false, error: "This requirement has no evidence in your region." };
@@ -32,64 +35,62 @@ export function applyAction(viewer: Viewer, id: string, input: ActionInput): { o
     return { ok: false, error: "Add a short reason. It goes into the audit trail." };
   }
 
-  const d = db();
   const base = { actor_type: "pm" as const, actor: viewer.actor, region: viewer.region, entity_type: "requirement", entity_id: id };
+  const ai = (actor: string) => ({ actor_type: "ai" as const, actor, region: viewer.region, entity_type: "requirement", entity_id: id });
+  const stmts: InStatement[] = [];
   const setStatus = (status: Status, action: string) => {
-    d.prepare("UPDATE requirements SET status = ?, updated_at = ? WHERE id = ?").run(status, nowIso(), id);
-    logEvent({ ...base, action, field: "status", before: req.status, after: status, rationale });
+    stmts.push({ sql: "UPDATE requirements SET status = ?, updated_at = ? WHERE id = ?", args: [status, nowIso(), id] });
+    stmts.push(auditStatement({ ...base, action, field: "status", before: req.status, after: status, rationale }));
   };
 
-  const tx = d.transaction(() => {
-    switch (input.action) {
-      case "approve":
-        setStatus("approved", "approved requirement");
-        break;
-      case "reject":
-        setStatus("rejected", "rejected requirement");
-        break;
-      case "validate":
-        setStatus("validate", "requested validation before deciding");
-        break;
-      case "reopen":
-        setStatus("proposed", "reopened requirement");
-        break;
-      case "edit": {
-        let changed = 0;
-        for (const [field, value] of Object.entries(input.fields ?? {}) as [EditableField, string][]) {
-          const before = (req[field] ?? "") as string;
-          const after = value.trim();
-          if (!after || after === before) continue;
-          d.prepare(`UPDATE requirements SET ${field} = ?, updated_at = ? WHERE id = ?`).run(after, nowIso(), id);
-          logEvent({ ...base, action: `edited ${field.replace("_", " ")}`, field, before, after, rationale });
-          changed++;
-        }
-        if (changed && req.status !== "approved") {
-          d.prepare("UPDATE requirements SET status = 'edited' WHERE id = ?").run(id);
-        }
-        break;
+  switch (input.action) {
+    case "approve":
+      setStatus("approved", "approved requirement");
+      break;
+    case "reject":
+      setStatus("rejected", "rejected requirement");
+      break;
+    case "validate":
+      setStatus("validate", "requested validation before deciding");
+      break;
+    case "reopen":
+      setStatus("proposed", "reopened requirement");
+      break;
+    case "edit": {
+      let changed = 0;
+      for (const field of EDITABLE) {
+        const value = input.fields?.[field];
+        if (typeof value !== "string") continue;
+        const before = (req[field] ?? "") as string;
+        const after = value.trim();
+        if (!after || after === before) continue;
+        stmts.push({ sql: `UPDATE requirements SET ${field} = ?, updated_at = ? WHERE id = ?`, args: [after, nowIso(), id] });
+        stmts.push(auditStatement({ ...base, action: `edited ${field.replace("_", " ")}`, field, before, after, rationale }));
+        changed++;
       }
-      case "challenge": {
-        logEvent({ ...base, action: "challenged requirement", rationale });
-        if (req.challenged) {
-          logEvent({ actor_type: "ai", actor: "Red-team check", region: viewer.region, entity_type: "requirement", entity_id: id, action: "already challenged, no further change" });
-          break;
-        }
-        const revised = req.challenge.revised_confidence;
-        const q = quadrantFor(req.priority, revised);
-        d.prepare("UPDATE requirements SET confidence = ?, quadrant = ?, challenged = 1, updated_at = ? WHERE id = ?").run(revised, q, nowIso(), id);
-        logEvent({
-          actor_type: "ai", actor: "Red-team check", region: viewer.region, entity_type: "requirement", entity_id: id,
-          action: `found ${req.challenge.issues.length} issue${req.challenge.issues.length === 1 ? "" : "s"}`,
-          rationale: req.challenge.issues.map((i) => i.text).join(" "),
-        });
-        logEvent({ actor_type: "ai", actor: "Scoring engine", region: viewer.region, entity_type: "requirement", entity_id: id, action: "revised confidence", field: "confidence", before: String(req.confidence), after: String(revised) });
-        if (q !== req.quadrant) {
-          logEvent({ actor_type: "ai", actor: "Scoring engine", region: viewer.region, entity_type: "requirement", entity_id: id, action: "moved quadrant", field: "quadrant", before: req.quadrant, after: q });
-        }
-        break;
+      if (changed && req.status !== "approved") {
+        stmts.push({ sql: "UPDATE requirements SET status = 'edited' WHERE id = ?", args: [id] });
       }
+      break;
     }
-  });
-  tx();
+    case "challenge": {
+      stmts.push(auditStatement({ ...base, action: "challenged requirement", rationale }));
+      if (req.challenged) {
+        stmts.push(auditStatement({ ...ai("Red-team check"), action: "already challenged, no further change" }));
+        break;
+      }
+      const revised = req.challenge.revised_confidence;
+      const q = await quadrantFor(req.priority, revised);
+      const issues = req.challenge.issues;
+      stmts.push({ sql: "UPDATE requirements SET confidence = ?, quadrant = ?, challenged = 1, updated_at = ? WHERE id = ?", args: [revised, q, nowIso(), id] });
+      stmts.push(auditStatement({ ...ai("Red-team check"), action: `found ${issues.length} issue${issues.length === 1 ? "" : "s"}`, rationale: issues.map((i) => i.text).join(" ") }));
+      stmts.push(auditStatement({ ...ai("Scoring engine"), action: "revised confidence", field: "confidence", before: String(req.confidence), after: String(revised) }));
+      if (q !== req.quadrant) {
+        stmts.push(auditStatement({ ...ai("Scoring engine"), action: "moved quadrant", field: "quadrant", before: req.quadrant, after: q }));
+      }
+      break;
+    }
+  }
+  await writeBatch(stmts);
   return { ok: true };
 }

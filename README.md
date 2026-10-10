@@ -31,6 +31,18 @@ After pulling changes to `pipeline/pmw/db.py`, rebuild: the build drops and recr
 Won't have this time below 45 (`MOSCOW` in `web/components/ui.tsx`). The Act / Validate first / Monitor / Park chip is the
 separate decision quadrant (priority × confidence).
 
+## Hosted demo
+
+Live at **https://product-minds-on-wheels.vercel.app** (Vercel project `product-minds-on-wheels`).
+
+- Online, the app reads and writes a hosted Turso database (SQLite in the cloud, free plan, added through the
+  Vercel Marketplace). Locally it uses `db/pmw.sqlite`. Same code, chosen in `web/lib/db.ts`.
+- Update the hosted data after a pipeline change: `cd web && vercel env pull .env.local && npm run db:push`.
+  This replaces everything online, including PM decisions made on the hosted demo.
+- Deploy code: `cd web && vercel deploy --prod`. The project is not connected to GitHub, so pushes do not deploy.
+- Search engines are kept out three ways (robots meta tag, `robots.txt`, `X-Robots-Tag` header). No analytics,
+  and the font is self-hosted, so visitors' browsers make no requests to third parties.
+
 ## How it fits together
 
 ```
