@@ -73,6 +73,12 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               {v.label}
             </Link>
           ))}
+          <div className="ml-auto flex shrink-0 items-center gap-2 py-2" aria-label="Export requirement list">
+            <span className="hidden text-[13px] text-ink-3 lg:inline">Requirement list in BMW format</span>
+            {/* Plain links: the route answers with a file download. */}
+            <a href={`/api/export?vehicle=${code}&format=csv`} className="btn-outline btn-sm" download>Export CSV</a>
+            <a href={`/api/export?vehicle=${code}&format=json`} className="btn-outline btn-sm" download>JSON</a>
+          </div>
         </div>
       </nav>
 
