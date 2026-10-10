@@ -70,6 +70,7 @@ export type Requirement = {
 export type EquipmentMatch = {
   vehicle: string;
   signal_or_requirement_id: string;
+  feature: string;
   match_type: "option_same_vehicle" | "package_same_vehicle" | "standard_other_vehicle" | "standard_but_failing";
   equipment_name: string;
   code: string | null;

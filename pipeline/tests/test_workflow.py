@@ -217,9 +217,9 @@ class ThemeTests(unittest.TestCase):
     def test_equipment_matches_survive_theme_merging(self):
         con = connection()
         self.addCleanup(con.close)
-        con.execute("INSERT INTO feedback VALUES ('G70-0001','G70','Source B','US','US','ICE','Wireless charging not working',NULL,NULL,1)")
-        con.execute("INSERT INTO feedback_labels VALUES ('G70-0001','Defect','Touch screen, operation',NULL,'bmw')")
-        con.execute("INSERT INTO equipment (vehicle,name,availability) VALUES ('G70','Wireless Charging Ablage','standard')")
+        con.execute("INSERT INTO feedback VALUES ('G70-0001','G70','Source B','US','US','ICE','Ventilated seats not working',NULL,NULL,1)")
+        con.execute("INSERT INTO feedback_labels VALUES ('G70-0001','Defect','Vehicle, climatization',NULL,'bmw')")
+        con.execute("INSERT INTO equipment (vehicle,name,availability) VALUES ('G70','Aktive Sitzbelüftung','standard')")
         signals.build(con, 'G70')
         evidence.build_equipment_matches(con, 'G70')
         match=con.execute('SELECT * FROM equipment_matches').fetchone()
