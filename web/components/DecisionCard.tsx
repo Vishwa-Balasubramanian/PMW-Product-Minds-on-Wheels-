@@ -121,7 +121,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
             }}
           />
         )}
-        <DecisionActions key={`${r.id}:${r.updated_at}`} r={r} />
+        <DecisionActions key={`${r.id}:${r.updated_at}`} r={r} hideApprove={r.kind === "market_conflict"} />
       </header>
 
       {r.challenged && (
