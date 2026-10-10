@@ -99,9 +99,18 @@ function toRequirement(r: Row): Requirement {
 }
 
 /** Requirements with evidence in at least one of the viewer's markets. */
+function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
+  if (viewer.region === "ALL") return r;
+  // Lists are also serialized into client component props. Raw quotes must not
+  // survive there just because the visible quote list is region-filtered.
+  return { ...r, customer_voice: null,
+    contradictions: r.contradictions.map((text) => text.split(" For example ")[0]) };
+}
+
 export async function listRequirements(viewer: Viewer, vehicle: string): Promise<Requirement[]> {
   const rows = await all("SELECT * FROM requirements WHERE vehicle = ? ORDER BY priority DESC, confidence DESC", [vehicle]);
-  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)));
+  return rows.map(toRequirement).filter((r) => r.markets.some((m) => viewer.markets.includes(m as Market)))
+    .map((r) => restrictRawEvidence(viewer, r));
 }
 
 export async function getRequirementRow(id: string): Promise<Requirement | undefined> {
@@ -118,7 +127,7 @@ export type RequirementView = {
 /** One requirement with the customer evidence the viewer may see. Logs the access. */
 export async function getRequirement(viewer: Viewer, id: string): Promise<RequirementView | undefined> {
   const req = await getRequirementRow(id);
-  if (!req) return undefined;
+  if (!req || !req.markets.some((m) => viewer.markets.includes(m as Market))) return undefined;
   const allQuotes = await all<Quote>(
     `SELECT f.id, f.text, f.source, f.market, f.country, f.powertrain, f.severity, e.role
      FROM signal_evidence e JOIN feedback f ON f.id = e.feedback_id WHERE e.signal_id = ?`,
@@ -128,7 +137,12 @@ export async function getRequirement(viewer: Viewer, id: string): Promise<Requir
   const hidden: Record<string, number> = {};
   for (const q of allQuotes) if (!viewer.markets.includes(q.market as Market)) hidden[q.market] = (hidden[q.market] ?? 0) + 1;
   await logAccess(viewer, id, Object.keys(hidden).length > 0);
-  return { requirement: req, quotes, hidden };
+  const requirement = restrictRawEvidence(viewer, req);
+  if (viewer.region !== "ALL") {
+    const voice = quotes.find((q) => q.role === "supports");
+    requirement.customer_voice = voice ? `“${voice.text.slice(0, 260)}” (${voice.id})` : null;
+  }
+  return { requirement, quotes, hidden };
 }
 
 async function logAccess(viewer: Viewer, id: string, restricted: boolean) {
@@ -239,7 +253,7 @@ export async function listSignals(vehicle: string): Promise<Signal[]> {
 export async function vehicleTotals(vehicle: string) {
   const [comments, unlabelled, signals, outOfScope] = await Promise.all([
     n("SELECT COUNT(*) n FROM feedback WHERE vehicle = ?", [vehicle]),
-    n("SELECT COUNT(*) n FROM feedback WHERE vehicle = ? AND classified = 0", [vehicle]),
+    n("SELECT COUNT(*) n FROM feedback f WHERE vehicle = ? AND NOT EXISTS (SELECT 1 FROM feedback_labels l WHERE l.feedback_id=f.id AND l.topic IS NOT NULL)", [vehicle]),
     n("SELECT COUNT(*) n FROM signals WHERE vehicle = ?", [vehicle]),
     n("SELECT COUNT(*) n FROM signals WHERE vehicle = ? AND in_scope = 0", [vehicle]),
   ]);

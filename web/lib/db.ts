@@ -13,7 +13,9 @@ function makeClient(): Client {
     return createClient({ url: remote, authToken: process.env.TURSO_AUTH_TOKEN });
   }
   const file = process.env.PMW_DB ?? path.join(process.cwd(), "..", "db", "pmw.sqlite");
-  return createClient({ url: pathToFileURL(path.resolve(file)).href });
+  // The local database is created at runtime; hosted deployments use Turso.
+  // Do not trace an environment-controlled path into the deployment bundle.
+  return createClient({ url: pathToFileURL(path.resolve(/* turbopackIgnore: true */ file)).href });
 }
 
 const g = globalThis as unknown as { __pmwDb?: Client };

@@ -6,6 +6,7 @@ Owner: Arjun. Next: extend TOPIC_TO_SURVEY, match equipment (Trickle-Down Finder
 from __future__ import annotations
 
 from .config import MARKETS
+from .themes import member_topics
 from . import db
 
 # English customer language to German option-list wording. Terms are intentionally
@@ -30,10 +31,12 @@ def build_equipment_matches(con, vehicle: str) -> None:
     con.execute("DELETE FROM equipment_matches WHERE vehicle = ?", (vehicle,))
     sigs = con.execute("SELECT id, topic FROM signals WHERE vehicle = ? AND in_scope = 1", (vehicle,)).fetchall()
     for sig in sigs:
+        topics = member_topics(sig['topic'])
         feedback = con.execute(
             "SELECT DISTINCT f.id, f.text FROM feedback f JOIN feedback_labels l ON l.feedback_id=f.id "
-            "WHERE f.vehicle=? AND l.topic=? AND l.feedback_type IN ('Wants','Difficult to Use','Defect')",
-            (vehicle, sig["topic"])).fetchall()
+            f"WHERE f.vehicle=? AND l.topic IN ({','.join('?' for _ in topics)}) "
+            "AND l.feedback_type IN ('Wants','Difficult to Use','Defect')",
+            (vehicle, *topics)).fetchall()
         if not feedback:
             continue
         for english, terms in EQUIPMENT_GLOSSARY.items():
@@ -148,6 +151,14 @@ def survey_gap(row) -> float:
 
 
 def survey_for_topic(con, vehicle: str, topic: str) -> list[dict]:
+    members = member_topics(topic)
+    if members != (topic,):
+        # Union every member's mappings; overlapping survey questions count once.
+        unique = {}
+        for member in members:
+            for row in survey_for_topic(con, vehicle, member):
+                unique[(row['market'], row['study'], row['attribute'], row['variant'])] = row
+        return [unique[key] for key in sorted(unique, key=str)]
     m = TOPIC_TO_SURVEY.get(topic)
     if not m:
         return []

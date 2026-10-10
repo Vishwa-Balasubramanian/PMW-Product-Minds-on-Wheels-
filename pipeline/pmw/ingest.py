@@ -52,8 +52,10 @@ def ingest_vehicles(con) -> None:
 
 def ingest_feedback(con, code: str) -> dict:
     path = RAW / VEHICLES[code]["feedback_file"]
-    ws = openpyxl.load_workbook(path, read_only=True).worksheets[0]
+    wb = openpyxl.load_workbook(path, read_only=True)
+    ws = wb.worksheets[0]
     rows = list(ws.iter_rows(values_only=True))
+    wb.close()
     header, rows = rows[0], rows[1:]
     idx = {h: i for i, h in enumerate(header)}
 
@@ -105,7 +107,7 @@ def ingest_feedback(con, code: str) -> dict:
     if n_rows != n_comments:
         db.issue(con, "feedback", "warning",
                  f"{n_rows:,} rows but {n_comments:,} comments: one comment is split across several rows, one per label.",
-                 "Stored one row per comment plus a separate labels table, so counts are per customer, not per row.", code)
+                 "Stored one row per comment plus a separate labels table; comment IDs do not establish unique customers.", code)
     if unclassified:
         db.issue(con, "feedback", "warning",
                  f"{unclassified:,} comments ({unclassified / n_comments:.0%}) have no topic label.",
@@ -185,6 +187,7 @@ def ingest_studies(con) -> None:
                  "Skipped. Requirements that would rely on them get no survey support.")
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id="customer_studies",
              action="ingested customer studies", after="CN_EU_2025 means, US_2025 distributions")
+    wb.close()
 
 
 def ingest_sales(con) -> None:
@@ -211,6 +214,7 @@ def ingest_sales(con) -> None:
                 con.execute("INSERT INTO sales (vehicle, market, year, volume) VALUES (?,?,?,?)", (code, mk, year, val))
     db.audit(con, actor_type="system", actor="Pipeline", entity_type="dataset", entity_id="sales",
              action="ingested sales volumes", after="2024, 2025, 2030 forecast by market")
+    wb.close()
 
 
 PRICE_RE = re.compile(r"^(?P<name>\S.*?)\s{2,}(?P<code>[0-9][0-9A-Z]{2}|[A-Z0-9]{3})\s+(?P<price>[\d.]+,[–-]|–,–)")

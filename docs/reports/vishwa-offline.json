@@ -1,0 +1,239 @@
+{
+  "passed": true,
+  "errors": [],
+  "theme_version": "2026-10-v1",
+  "weights": {
+    "priority": {
+      "impact": 0.35,
+      "frequency": 0.25,
+      "market": 0.2,
+      "competitive": 0.05,
+      "future": 0.15
+    },
+    "confidence": {
+      "quantity": 0.25,
+      "sources": 0.25,
+      "representation": 0.2,
+      "agreement": 0.2,
+      "recency": 0.1
+    },
+    "thresholds": {
+      "priority": 55,
+      "confidence": 58
+    }
+  },
+  "data_sha256": {
+    "F70_G60_G68_G70_customer_studies.xlsx": "652386b8ccea0bec0e9f9b4648e6a971f1dc19d32e26c50111614153701bff17",
+    "F70_OptionList.PDF": "e7823aecbb4cc2b8b267ea65a0f128f464fc241719791082c30979dcb885635d",
+    "F70_feedback_hackathon.xlsx": "651f09e3d899eb6fd294ee89aee23cc41417030425ec19420fbf615ad798163e",
+    "G60_OptionList.PDF": "97ee14fae6239473f125d72518b710d72e3a7c5481c2e6b635d3c1f289a2669d",
+    "G60_feedback_hackathon.xlsx": "ffaeb3ab943d299380542c228b3d944ed749bc80af54c75aa30a5e84b221d34f",
+    "G70_OptionList.PDF": "77be9d9cb39db058928e8f6a1a02ae1ec4e2055afde1235751466b5c97b524f0",
+    "G70_feedback_hackathon.xlsx": "60d1c9932283bc244661ce9cd6c825099714d855bc4f3b9f1544d49a80821cf1",
+    "sales_volumes.xlsx": "43db87dd0b52412a8912069a45c97b3b15900b5a00d3b79a5ec65ddcee1f49cf"
+  },
+  "vehicles": {
+    "F70": {
+      "comments": 2128,
+      "labelled_comments_by_source": {
+        "bmw": 1828,
+        "rule": 1
+      },
+      "unlabelled": 299,
+      "requirements": 37,
+      "core_requirements": 15,
+      "equipment_quick_wins": 22,
+      "core_quadrants": {
+        "act": 10,
+        "validate": 5,
+        "monitor": 0,
+        "park": 0
+      },
+      "quadrants": {
+        "act": 11,
+        "validate": 21,
+        "monitor": 0,
+        "park": 5
+      },
+      "equipment_entries_best_effort": 134,
+      "draft_sources": [
+        "evidence-template:v2"
+      ],
+      "borderline_priorities": [
+        "R-F70-b4068f9bb6",
+        "R-F70-bd754dd6ed",
+        "R-F70-6f21a1b28a"
+      ],
+      "confidence_threshold_scenarios": {
+        "55": {
+          "act": 16,
+          "validate": 16,
+          "monitor": 0,
+          "park": 5
+        },
+        "58": {
+          "act": 11,
+          "validate": 21,
+          "monitor": 0,
+          "park": 5
+        },
+        "60": {
+          "act": 9,
+          "validate": 23,
+          "monitor": 0,
+          "park": 5
+        },
+        "62": {
+          "act": 8,
+          "validate": 24,
+          "monitor": 0,
+          "park": 5
+        },
+        "65": {
+          "act": 6,
+          "validate": 26,
+          "monitor": 0,
+          "park": 5
+        }
+      }
+    },
+    "G60": {
+      "comments": 4000,
+      "labelled_comments_by_source": {
+        "bmw": 3560,
+        "rule": 127
+      },
+      "unlabelled": 313,
+      "requirements": 56,
+      "core_requirements": 15,
+      "equipment_quick_wins": 41,
+      "core_quadrants": {
+        "act": 9,
+        "validate": 4,
+        "monitor": 1,
+        "park": 1
+      },
+      "quadrants": {
+        "act": 11,
+        "validate": 8,
+        "monitor": 3,
+        "park": 34
+      },
+      "equipment_entries_best_effort": 206,
+      "draft_sources": [
+        "evidence-template:v2"
+      ],
+      "borderline_priorities": [
+        "R-G60-59dd82ef17",
+        "R-G60-de7402f550",
+        "R-G60-6922285a35",
+        "R-G60-3652e6b12d",
+        "R-G60-bf9d5d795f",
+        "R-G60-3931e621b2"
+      ],
+      "confidence_threshold_scenarios": {
+        "55": {
+          "act": 12,
+          "validate": 7,
+          "monitor": 4,
+          "park": 33
+        },
+        "58": {
+          "act": 11,
+          "validate": 8,
+          "monitor": 3,
+          "park": 34
+        },
+        "60": {
+          "act": 10,
+          "validate": 9,
+          "monitor": 3,
+          "park": 34
+        },
+        "62": {
+          "act": 10,
+          "validate": 9,
+          "monitor": 1,
+          "park": 36
+        },
+        "65": {
+          "act": 9,
+          "validate": 10,
+          "monitor": 0,
+          "park": 37
+        }
+      }
+    },
+    "G70": {
+      "comments": 4000,
+      "labelled_comments_by_source": {
+        "bmw": 3560,
+        "rule": 132
+      },
+      "unlabelled": 308,
+      "requirements": 38,
+      "core_requirements": 15,
+      "equipment_quick_wins": 23,
+      "core_quadrants": {
+        "act": 6,
+        "validate": 2,
+        "monitor": 3,
+        "park": 4
+      },
+      "quadrants": {
+        "act": 8,
+        "validate": 5,
+        "monitor": 4,
+        "park": 21
+      },
+      "equipment_entries_best_effort": 235,
+      "draft_sources": [
+        "evidence-template:v2"
+      ],
+      "borderline_priorities": [
+        "R-G70-36b067e9c2",
+        "R-G70-b938fd921f",
+        "R-G70-f29a12cd8b",
+        "R-G70-f9ca5fdb85"
+      ],
+      "confidence_threshold_scenarios": {
+        "55": {
+          "act": 8,
+          "validate": 5,
+          "monitor": 6,
+          "park": 19
+        },
+        "58": {
+          "act": 8,
+          "validate": 5,
+          "monitor": 4,
+          "park": 21
+        },
+        "60": {
+          "act": 8,
+          "validate": 5,
+          "monitor": 2,
+          "park": 23
+        },
+        "62": {
+          "act": 8,
+          "validate": 5,
+          "monitor": 2,
+          "park": 23
+        },
+        "65": {
+          "act": 7,
+          "validate": 6,
+          "monitor": 2,
+          "park": 23
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Offline drafts are reviewed task templates, not live LLM output.",
+    "Rule labels are provisional; abstention is not a missing response.",
+    "Scores and sensitivity scenarios are heuristics, not statistical probabilities.",
+    "German equipment extraction is best effort; availability in other markets is unknown."
+  ]
+}

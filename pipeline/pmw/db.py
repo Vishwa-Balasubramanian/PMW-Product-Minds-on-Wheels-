@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS feedback_labels (
   feedback_type TEXT,              -- Likes, Difficult to Use, Defect, Wants
   topic TEXT,                      -- BMW taxonomy level 2
   subtopic TEXT,                   -- BMW taxonomy level 3
-  label_source TEXT NOT NULL DEFAULT 'bmw'   -- bmw | ai
+  label_source TEXT NOT NULL DEFAULT 'bmw'   -- bmw | ai | rule (provisional offline labels)
 );
 CREATE INDEX IF NOT EXISTS idx_labels_fb ON feedback_labels(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_labels_topic ON feedback_labels(topic);
@@ -173,10 +173,10 @@ CREATE TABLE IF NOT EXISTS requirements (
   confidence INTEGER NOT NULL,     -- 0..100, deterministic, separate from priority
   confidence_factors TEXT NOT NULL,
   quadrant TEXT NOT NULL,          -- act | validate | monitor | park
-  challenge TEXT NOT NULL,         -- JSON {issues: [...], revised_confidence}
+  challenge TEXT NOT NULL,         -- JSON {issues, revised_confidence, narrative?, narrative_source?, priority_sensitivity?}
   challenged INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'proposed',  -- proposed | approved | rejected | validate | edited
-  generated_by TEXT NOT NULL,      -- template | llm:<model>
+  generated_by TEXT NOT NULL,      -- evidence-template:v2 | llm:<model> | cache:llm:<model>
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

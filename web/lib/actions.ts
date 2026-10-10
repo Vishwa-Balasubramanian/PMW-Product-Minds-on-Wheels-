@@ -68,8 +68,8 @@ export async function applyAction(viewer: Viewer, id: string, input: ActionInput
         stmts.push(auditStatement({ ...base, action: `edited ${field.replace("_", " ")}`, field, before, after, rationale }));
         changed++;
       }
-      if (changed && req.status !== "approved") {
-        stmts.push({ sql: "UPDATE requirements SET status = 'edited' WHERE id = ?", args: [id] });
+      if (changed) {
+        setStatus("edited", "marked requirement for review after edit");
       }
       break;
     }

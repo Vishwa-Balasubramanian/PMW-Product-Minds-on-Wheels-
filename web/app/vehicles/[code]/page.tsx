@@ -27,14 +27,14 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const vehicle = await getVehicle(code);
   if (!vehicle) notFound();
   const viewer = await getViewer();
-  const view = (typeof sp.view === "string" ? sp.view : "inbox") as (typeof VIEWS)[number]["k"];
-  const qFilter = typeof sp.q === "string" ? (sp.q as Quadrant) : null;
+  const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
+  const qFilter = typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels] = await Promise.all([
     listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(),
   ]);
   const reqs = qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
-  const selectedId = typeof sp.req === "string" ? sp.req : reqs[0]?.id;
+  const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
   return (
