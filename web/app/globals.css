@@ -1,39 +1,59 @@
 @import "tailwindcss";
 
-/* Albert Sans, self-hosted (no requests to Google from visitors' browsers). SIL Open Font License. */
-@font-face { font-family: "Albert Sans"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/albert-sans-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
-@font-face { font-family: "Albert Sans"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/albert-sans-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* Typography. "BMW Type Next" is used where it is installed on the viewer's machine (local only).
+   Licensed BMW Type Next files are not in public/fonts, so no file-based @font-face is declared for it;
+   when the files are added, add url() sources to the rule below. Fallback: Inter, self-hosted
+   (no requests to Google from visitors' browsers). Inter: SIL Open Font License. */
+@font-face { font-family: "BMW Type Next"; font-weight: 300 700; font-display: swap; src: local("BMW Type Next"), local("BMWTypeNext"), local("BMW Type Next Latin"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/inter-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/inter-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
-/* Design tokens. Visual language follows bmw.de: photography first, light body type,
-   uppercase bold headlines, square buttons, one blue. Change colours here, not in components. */
+/* BMW Group brand palette. Use these names in new CSS. */
+:root {
+  --bmw-blue: #1C69D4;      /* primary actions, links, the P */
+  --bmw-blue-dark: #0653B6; /* hover */
+  --bmw-black: #262626;     /* text, header */
+  --bmw-grey: #6F6F6F;      /* secondary text */
+  --bmw-line: #E6E6E6;      /* borders */
+  --bmw-bg: #FFFFFF;
+  --bmw-bg-soft: #F6F6F6;   /* section backgrounds */
+  --status-approve: #2E7D32;
+  --status-reject: #C62828;
+  --status-challenge: #F29400;
+  --header-h: 72px;
+}
+
+/* Tailwind tokens, mapped onto the brand palette. Components use these (bg-blue, text-ink, border-line...). */
 @theme {
-  --font-sans: "Albert Sans", Arial, Helvetica, sans-serif;
+  --font-sans: "BMW Type Next", "Inter", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  --color-blue: #1c69d4;
-  --color-blue-dark: #0653b6;
+  --color-blue: #1C69D4;
+  --color-blue-dark: #0653B6;
   --color-ink: #262626;
-  --color-ink-2: #4d4d4d;
-  --color-ink-3: #8e8e8e;
-  --color-line: #e4e4e4;
-  --color-mist: #f5f5f5;
+  --color-ink-2: #4D4D4D;
+  --color-ink-3: #6F6F6F;
+  --color-line: #E6E6E6;
+  --color-mist: #F6F6F6;
   --color-night: #0d0f12;
 
-  --color-act: #1f7a4d;
-  --color-act-soft: #e3f2ea;
-  --color-validate: #b86e00;
-  --color-validate-soft: #fbf0dc;
-  --color-monitor: #1c69d4;
-  --color-monitor-soft: #e6effb;
-  --color-park: #6f6f6f;
-  --color-park-soft: #efefef;
-  --color-must: #c4302b;
-  --color-should: #d9730d;
-  --color-could: #1c69d4;
-  --color-wont: #8e8e8e;
+  --color-act: #2E7D32;
+  --color-act-soft: #E6F2E7;
+  --color-validate: #B86E00;
+  --color-validate-soft: #FBF0DC;
+  --color-monitor: #1C69D4;
+  --color-monitor-soft: #E6EFFB;
+  --color-park: #6F6F6F;
+  --color-park-soft: #EFEFEF;
+  --color-must: #C62828;
+  --color-should: #D9730D;
+  --color-could: #1C69D4;
+  --color-wont: #8E8E8E;
 
-  --color-danger: #c4302b;
-  --color-danger-soft: #fbe7e6;
+  --color-danger: #C62828;
+  --color-danger-soft: #FBE7E6;
+  --color-challenge: #F29400;
+  --color-challenge-soft: #FEF3E2;
 
   --animate-rise: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-settle: settle 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -50,32 +70,34 @@
 
 html { color-scheme: light; }
 body {
-  background: #fff;
-  color: var(--color-ink);
+  background: var(--bmw-bg);
+  color: var(--bmw-black);
   font-family: var(--font-sans);
-  font-weight: 300;
-  font-size: 15px;
-  line-height: 1.6;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-b, strong { font-weight: 600; }
+b, strong { font-weight: 700; }
 :focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-/* Reusable pieces (Tailwind v4 custom utilities, usable in class names and @apply). */
-@utility headline { text-transform: uppercase; font-weight: 700; letter-spacing: 0.01em; line-height: 1.05; }
-@utility eyebrow { text-transform: uppercase; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: var(--color-ink-3); }
+/* Reusable pieces (Tailwind v4 custom utilities, usable in class names and @apply).
+   BMW style: light, large headlines; uppercase bold labels and buttons; square corners; thin borders. */
+@utility headline { font-weight: 300; letter-spacing: -0.005em; line-height: 1.1; }
+@utility eyebrow { text-transform: uppercase; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--bmw-grey); }
 @utility btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  height: 3rem; padding-inline: 1.5rem; font-size: 15px; font-weight: 500; cursor: pointer;
-  transition: background-color .2s, color .2s, border-color .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border-radius: 0;
+  height: 3rem; padding-inline: 1.5rem; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer; transition: background-color .2s, color .2s, border-color .2s;
   &:disabled { cursor: not-allowed; opacity: .5; }
 }
 @utility btn-primary { @apply btn bg-blue text-white hover:bg-blue-dark; }
 @utility btn-outline { @apply btn border border-ink bg-white text-ink hover:bg-ink hover:text-white; }
 @utility btn-ghost-light { @apply btn border border-white/70 text-white hover:bg-white hover:text-ink; }
-@utility btn-sm { height: 2.5rem; padding-inline: 1rem; font-size: 14px; }
-@utility container-x { margin-inline: auto; width: 100%; max-width: 1440px; padding-inline: 1rem; @media (width >= 40rem) { padding-inline: 2rem; } @media (width >= 64rem) { padding-inline: 3rem; } }
+@utility btn-sm { height: 2.5rem; padding-inline: 1rem; font-size: 13px; }
+@utility card { background: var(--bmw-bg); border: 1px solid var(--bmw-line); }
+@utility container-x { margin-inline: auto; width: 100%; max-width: 1280px; padding-inline: 1rem; @media (width >= 40rem) { padding-inline: 2rem; } @media (width >= 64rem) { padding-inline: 3rem; } }

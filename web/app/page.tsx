@@ -21,8 +21,9 @@ export default async function Home() {
 
   return (
     <main className="flex-1">
+      <Header viewer={viewer} />
       <section className="relative h-[max(620px,min(92vh,960px))] bg-night text-white">
-        <Header viewer={viewer} variant="overlay" />
+        
         <div className="grid h-full grid-cols-1 md:grid-cols-3">
           {lanes.map((v, i) => (
             <article
@@ -73,7 +74,7 @@ export default async function Home() {
         <div className="mx-auto max-w-[720px] text-center">
           <h1 className="headline text-[32px] sm:text-[40px]">What should the next generation offer?</h1>
           <p className="mt-4 text-[17px] text-ink-2">
-            Product Minds on Wheels turns customer evidence into requirements a product manager can defend:
+            PMW, the Product Manager&apos;s Workbench, turns customer evidence into requirements a product manager can defend:
             every claim links to its source, and every decision stays with a person.
           </p>
         </div>
@@ -94,7 +95,7 @@ export default async function Home() {
 
       <footer className="border-t border-line">
         <div className="container-x flex flex-wrap justify-between gap-4 py-8 text-[13px] text-ink-3">
-          <span>Product Minds on Wheels · EHL Grand Finale 2026 · BMW challenge prototype</span>
+          <span>PMW · Product Manager&apos;s Workbench · EHL Grand Finale 2026 · BMW challenge prototype</span>
           <span>Vehicle photography from the BMW price lists provided for the hackathon.</span>
         </div>
       </footer>
