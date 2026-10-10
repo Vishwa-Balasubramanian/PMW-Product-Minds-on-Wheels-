@@ -17,6 +17,11 @@ export function QuickWinBadge() {
   return <span className="inline-flex h-6 items-center border border-blue px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-blue">Quick win</span>;
 }
 
+/** China and Europe disagree in the customer study (requirement.kind === "market_conflict"). */
+export function ConflictBadge() {
+  return <span className="inline-flex h-6 items-center border border-validate px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-validate">Market conflict</span>;
+}
+
 const S_STYLE: Record<Status, string> = {
   proposed: "border border-line text-ink-2",
   edited: "bg-validate-soft text-validate",

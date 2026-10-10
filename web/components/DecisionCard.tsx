@@ -2,6 +2,7 @@ import type { Viewer } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
 import { AlreadySellBanner } from "./AlreadySellBanner";
+import { ConflictBlock } from "./ConflictBlock";
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
@@ -70,6 +71,8 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
   const contradicts = quotes.filter((q) => q.role === "contradicts");
   const hiddenTotal = Object.values(hidden).reduce((a, b) => a + b, 0);
   const originalConfidence = events.find((e) => e.field === "confidence")?.before;
+  // Events arrive newest first: the latest approval carries the scope decision of a market conflict card.
+  const approval = r.status === "approved" ? events.find((e) => e.field === "status" && e.after === "approved") : undefined;
 
   return (
     <article className="flex flex-col gap-6">
@@ -107,6 +110,17 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
         <AlreadySellBanner r={r} linkable={new Set([...supports.slice(0, 8), ...contradicts.slice(0, 3)].map((q) => q.id))} />
+        {r.kind === "market_conflict" && (
+          <ConflictBlock
+            key={`conflict:${r.id}:${r.updated_at}`}
+            r={{ id: r.id, kind: r.kind, status: r.status, conflicts: r.conflicts }}
+            approval={approval && {
+              actor: approval.actor,
+              rationale: approval.rationale,
+              when: new Date(approval.ts).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+            }}
+          />
+        )}
         <DecisionActions key={`${r.id}:${r.updated_at}`} r={r} />
       </header>
 
