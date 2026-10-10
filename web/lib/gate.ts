@@ -164,6 +164,70 @@ async function logAccess(viewer: Viewer, id: string, restricted: boolean) {
   ]);
 }
 
+// ---------- export ----------
+
+export type ExportBundle = {
+  requirements: Requirement[];
+  /** Supporting comment IDs per signal: the ones the viewer may see, and counts per hidden market. */
+  evidence: Map<string, { visible: string[]; hidden: Record<string, number> }>;
+  /** Most recent product-manager decision per requirement. */
+  lastDecision: Map<string, AuditEvent>;
+};
+
+/** Everything the requirement export needs, filtered by the viewer's region. */
+export async function exportBundle(viewer: Viewer, vehicle: string): Promise<ExportBundle> {
+  // listRequirements already applies restrictRawEvidence (no raw quotes outside the viewer's market).
+  const requirements = await listRequirements(viewer, vehicle);
+  const evidence: ExportBundle["evidence"] = new Map();
+  const lastDecision: ExportBundle["lastDecision"] = new Map();
+  if (!requirements.length) return { requirements, evidence, lastDecision };
+
+  const signalIds = [...new Set(requirements.map((r) => r.signal_id))];
+  const rows = await all<{ signal_id: string; id: string; market: string; text: string }>(
+    `SELECT e.signal_id, f.id, f.market, f.text FROM signal_evidence e JOIN feedback f ON f.id = e.feedback_id
+     WHERE e.role = 'supports' AND e.signal_id IN ${inList(signalIds)} ORDER BY e.rowid`,
+    signalIds,
+  );
+  const firstVisible = new Map<string, { id: string; text: string }>();
+  for (const r of rows) {
+    const e = evidence.get(r.signal_id) ?? { visible: [], hidden: {} };
+    if (viewer.markets.includes(r.market as Market)) {
+      e.visible.push(r.id);
+      if (!firstVisible.has(r.signal_id)) firstVisible.set(r.signal_id, { id: r.id, text: r.text });
+    } else e.hidden[r.market] = (e.hidden[r.market] ?? 0) + 1;
+    evidence.set(r.signal_id, e);
+  }
+  // Same rule as getRequirement: the customer voice is the first supporting quote the viewer may see.
+  if (viewer.region !== "ALL") {
+    for (const r of requirements) {
+      const q = firstVisible.get(r.signal_id);
+      r.customer_voice = q ? `“${q.text.slice(0, 260)}” (${q.id})` : null;
+    }
+  }
+
+  const reqIds = requirements.map((r) => r.id);
+  const decisions = await all<AuditEvent>(
+    `SELECT * FROM audit_events WHERE actor_type = 'pm' AND entity_type = 'requirement' AND entity_id IN ${inList(reqIds)} ORDER BY id`,
+    reqIds,
+  );
+  for (const d of decisions) lastDecision.set(d.entity_id!, d);
+  return { requirements, evidence, lastDecision };
+}
+
+export async function logExport(viewer: Viewer, vehicle: string, format: string, count: number) {
+  await writeBatch([
+    auditStatement({
+      actor_type: "pm",
+      actor: viewer.actor,
+      region: viewer.region,
+      entity_type: "dataset",
+      entity_id: vehicle,
+      action: "exported requirement list",
+      after: `${count} requirements as ${format.toUpperCase()}`,
+    }),
+  ]);
+}
+
 // ---------- audit ----------
 
 export type NewAuditEvent = Omit<AuditEvent, "id" | "ts" | "field" | "before" | "after" | "rationale"> & Partial<AuditEvent>;
