@@ -5,6 +5,15 @@ import { AlreadySellBanner } from "./AlreadySellBanner";
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
+/** Who drafted the requirement. Only output from an actual model is called an AI draft. */
+function draftLabel(generatedBy: string): string {
+  if (generatedBy.startsWith("llm:")) return "AI draft · needs validation";
+  if (generatedBy.startsWith("evidence-template")) return "Evidence-based draft · needs validation";
+  if (generatedBy === "equipment_matcher") return "Price-list match · needs validation";
+  if (generatedBy === "template") return "Template draft";
+  return "Draft · needs validation";
+}
+
 const PENDING = "Further evidence is needed before this step can be completed.";
 
 function Ladder({ r }: { r: Requirement }) {
@@ -94,7 +103,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
           <span className="font-mono text-ink-2">{r.id}</span>
           <span className="font-semibold text-ink">Rank {siblings.findIndex((x) => x.id === r.id) + 1} of {siblings.length} · priority {r.priority}</span>
-          <span>· {r.generated_by.startsWith("evidence-template") ? "Evidence-based draft · needs validation" : r.generated_by === "template" ? "Template draft" : "AI draft · needs validation"}</span>
+          <span>· {draftLabel(r.generated_by)}</span>
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
         <AlreadySellBanner r={r} linkable={new Set([...supports.slice(0, 8), ...contradicts.slice(0, 3)].map((q) => q.id))} />

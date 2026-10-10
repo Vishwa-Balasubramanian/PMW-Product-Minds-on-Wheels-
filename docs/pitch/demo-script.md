@@ -54,8 +54,8 @@ G70-1817 and more. Click **All** to return to the full list.
 
 Avoid on stage: "Offer ventilated front seats outside €4,450 Executive Paket (9DA)". Its title names the rear-seat
 package; front ventilation is in the Connoisseur Paket (9DC, €3,200). The banner on that card lists both rows, but
-the title is wrong (flagged to Arjun). Also note that quick-win cards read "AI draft · needs validation", although
-they come from the equipment matcher, not an AI model (flagged; `DecisionCard.tsx`).
+the title is wrong (flagged to Arjun). Quick-win cards read "Price-list match · needs validation": they come from the
+equipment matcher, not an AI model.
 
 <!--
 Expected values, fresh build of main 2381fb1:

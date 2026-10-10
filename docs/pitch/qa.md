@@ -21,7 +21,7 @@ validation". Either way, the numbers never come from the model.
      SELECT label_source, COUNT(DISTINCT feedback_id) FROM feedback_labels GROUP BY 1;  -> bmw 8948, rule 260
      pipeline/cache/ holds only README.md ("No live generation was run for the offline deliverable").
      AI path: pipeline/pmw/ai.py, classify.py, derive.py generate(), challenge.py explain(). Card label: DecisionCard.tsx.
-     Known label bug: quick wins (generated_by 'equipment_matcher') currently show "AI draft · needs validation". -->
+     Quick wins (generated_by 'equipment_matcher') show "Price-list match · needs validation"; "AI draft" only for llm:* output. -->
 
 ### 2. How do you stop the AI from making things up?
 
