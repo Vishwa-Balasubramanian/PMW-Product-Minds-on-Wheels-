@@ -17,7 +17,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   const vehicle = typeof sp.vehicle === "string" ? sp.vehicle : "";
   const who = typeof sp.who === "string" ? sp.who : "";
   const viewer = await getViewer();
-  let events = await auditLog({ vehicle: vehicle || undefined, limit: 600 });
+  let events = await auditLog(viewer, { vehicle: vehicle || undefined, limit: 600 });
   if (who) events = events.filter((e) => e.actor_type === who);
 
   return (

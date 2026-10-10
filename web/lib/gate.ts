@@ -270,19 +270,49 @@ export function auditStatement(e: NewAuditEvent): InStatement {
   };
 }
 
-export async function auditFor(entityId: string): Promise<AuditEvent[]> {
-  return all<AuditEvent>("SELECT * FROM audit_events WHERE entity_id = ? ORDER BY id DESC", [entityId]);
+const COMMENT_ID = /\b[A-Z][0-9]{2}-\d{4}\b/g;
+
+/**
+ * Audit text can name comment IDs (e.g. "3 wishing customer comments: G60-0532, …"). IDs from markets outside the
+ * viewer's region are replaced, so the trail follows the same rule as the evidence, the banner and the export.
+ */
+async function redactAuditIds(viewer: Viewer, events: AuditEvent[]): Promise<AuditEvent[]> {
+  if (viewer.region === "ALL") return events;
+  const fields = ["action", "before", "after", "rationale"] as const;
+  const ids = new Set<string>();
+  for (const e of events) for (const f of fields) for (const m of (e[f] ?? "").matchAll(COMMENT_ID)) ids.add(m[0]);
+  if (!ids.size) return events;
+  const list = [...ids];
+  const rows = await all<{ id: string; market: string }>(`SELECT id, market FROM feedback WHERE id IN ${inList(list)}`, list);
+  const marketOf = new Map(rows.map((r) => [r.id, r.market]));
+  const hidden = (id: string) => {
+    const m = marketOf.get(id);
+    return m ? !viewer.markets.includes(m as Market) : false; // not a known comment ID: leave as is
+  };
+  return events.map((e) => {
+    const out = { ...e };
+    for (const f of fields) {
+      const v = out[f];
+      if (v) out[f] = v.replace(COMMENT_ID, (id) => (hidden(id) ? `[comment from ${MARKET_LABEL[marketOf.get(id)!] ?? "another market"}]` : id));
+    }
+    return out;
+  });
 }
 
-export async function auditLog(opts: { vehicle?: string; limit?: number } = {}): Promise<AuditEvent[]> {
+export async function auditFor(viewer: Viewer, entityId: string): Promise<AuditEvent[]> {
+  const events = await all<AuditEvent>("SELECT * FROM audit_events WHERE entity_id = ? ORDER BY id DESC", [entityId]);
+  return redactAuditIds(viewer, events);
+}
+
+export async function auditLog(viewer: Viewer, opts: { vehicle?: string; limit?: number } = {}): Promise<AuditEvent[]> {
   const lim = opts.limit ?? 400;
-  if (opts.vehicle) {
-    return all<AuditEvent>(
-      "SELECT * FROM audit_events WHERE entity_id LIKE ? OR entity_id = ? OR entity_id LIKE ? ORDER BY id DESC LIMIT ?",
-      [`R-${opts.vehicle}-%`, opts.vehicle, `S-${opts.vehicle}-%`, lim],
-    );
-  }
-  return all<AuditEvent>("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", [lim]);
+  const events = opts.vehicle
+    ? await all<AuditEvent>(
+        "SELECT * FROM audit_events WHERE entity_id LIKE ? OR entity_id = ? OR entity_id LIKE ? ORDER BY id DESC LIMIT ?",
+        [`R-${opts.vehicle}-%`, opts.vehicle, `S-${opts.vehicle}-%`, lim],
+      )
+    : await all<AuditEvent>("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", [lim]);
+  return redactAuditIds(viewer, events);
 }
 
 // ---------- vehicle-level evidence ----------

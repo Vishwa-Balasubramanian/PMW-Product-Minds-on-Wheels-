@@ -114,7 +114,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
 
   async function Inbox() {
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
-    const events = detail ? await auditFor(detail.requirement.id) : [];
+    const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
       <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
         <aside className="flex flex-col gap-3 lg:sticky lg:top-[140px] lg:max-h-[calc(100vh-170px)] lg:self-start">
