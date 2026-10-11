@@ -1,0 +1,54 @@
+Create these changes as a PR and analyse them and everything works out fin, merge them
+
+
+<pasted_content id="ab2e">
+Rebrand the PMW web app to look like an official BMW Group internal tool.
+Keep all existing functionality; change only branding, typography and styling.
+
+1. LOGO LOCKUP (top-left of the header)
+- Use the OFFICIAL BMW logo as an image file: /public/brand/bmw-logo.svg
+  (I will add this file myself from the hackathon organizers / BMW press kit).
+  Do NOT redraw, recolor, crop, or modify the BMW logo in any way.
+  Size: 40px high, with at least 16px empty space around it.
+- To the right of the logo: a thin vertical divider (1px, #BBBBBB, 32px high), then
+  the PMW wordmark.
+- PMW wordmark: text "PMW", uppercase, font-weight 700, letter-spacing 0.02em.
+  The letter "P" is highlighted in BMW Blue (#1C69D4); "MW" is in dark grey (#262626).
+  Build it as: <span class="pmw-p">P</span><span>MW</span>
+- Under or beside the wordmark, small subtitle: "Product Manager's Workbench"
+  (font-weight 300, 12px, #6F6F6F).
+- Small text far right of header: "for BMW Group · Hackathon Prototype".
+
+2. TYPOGRAPHY
+- Primary font: "BMW Type Next" ONLY if the font files exist in /public/fonts/
+  (load with @font-face, weights 300/400/700).
+- Fallback stack (use this if the files are missing):
+  font-family: "BMW Type Next", "Inter", "Helvetica Neue", Arial, sans-serif;
+  Load Inter from Google Fonts (weights 300, 400, 700).
+- Style rules: headlines are light (300) and large; labels and buttons uppercase,
+  700, letter-spacing 0.05em; body 400, 16px, line-height 1.5.
+
+3. COLORS (CSS variables in :root)
+  --bmw-blue: #1C69D4;      /* primary actions, links, the P */
+  --bmw-blue-dark: #0653B6; /* hover */
+  --bmw-black: #262626;     /* text, header */
+  --bmw-grey: #6F6F6F;      /* secondary text */
+  --bmw-line: #E6E6E6;      /* borders */
+  --bmw-bg: #FFFFFF;
+  --bmw-bg-soft: #F6F6F6;   /* section backgrounds */
+  Status colors: approve #2E7D32, reject #C62828, challenge #F29400.
+
+4. STYLE (BMW website feel)
+- Lots of white space, clean grid, max content width 1280px.
+- Square corners (border-radius 0-2px), no heavy shadows, thin 1px borders.
+- Primary button: BMW Blue background, white uppercase text, no rounding.
+- Secondary button: white background, 1px #262626 border.
+- Cards: white, 1px --bmw-line border, 24px padding.
+- Header: white, 72px high, 1px bottom border.
+
+5. RULES
+- Never alter the BMW logo; it only appears as the provided image file.
+- The highlighted "P" lives only in our own PMW wordmark.
+- Keep it responsive (works on 375px phone width).
+- Add a favicon using only the PMW wordmark (blue P), not the BMW logo.
+</pasted_content id="ab2e">
