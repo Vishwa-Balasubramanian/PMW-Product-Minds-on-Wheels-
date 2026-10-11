@@ -1,145 +1,177 @@
 # Product Minds on Wheels (PMW)
 
-AI decision support for BMW product managers: from customer evidence to traceable, prioritised requirements for
-the next vehicle generation, with the product manager deciding every step. EHL Grand Finale 2026, BMW track.
+PMW helps a BMW product manager decide what the next generation of a car should offer. It reads the customer
+feedback, surveys, sales figures and price lists BMW gave us, turns them into requirements, and shows the evidence
+behind each one. The product manager makes every decision, and every decision is written down.
+
+We built it for the BMW track of the EHL Grand Finale 2026.
+
+**Live demo:** https://product-minds-on-wheels.vercel.app
 
 ```
 Customer voice → Signal → Root cause → Customer need → Requirement → Priority + Confidence → PM decision → Audit trail
 ```
 
-## Run it (10 minutes)
+## What you can do
 
-Needs: Node 24, current npm, and [uv](https://docs.astral.sh/uv/). The pipeline reads
-the supplied PDFs directly with Python, including on Windows.
+**Pick a car.** The home page shows the 1, 5 and 7 Series. Cars that aren't sold in your region are greyed out,
+and cars with no customer comments from your region say so.
+
+**Work through its requirements.** Each car page has five tabs:
+
+- **Requirements:** a MoSCoW board (Must, Should, Could, Won't have this time), grouped by priority score, with the
+  full Decision Card next to it. Filter by Act, Validate first, Monitor, Park, Quick wins or Conflicts, or search.
+- **Decisions:** the same requirements sorted by where they are in the workflow (To review, Needs validation,
+  Edited, Approved, Rejected). Drag a card to another column, or use its "…" menu, to approve, reject or ask for
+  validation.
+- **Decision matrix:** priority against confidence, so you can see what is important but not yet proven.
+- **Signals:** the customer topics behind the requirements, with counts.
+- **Data health:** where the evidence is thin (missing voices), where China and Europe disagree, what share of
+  customer pain your approved requirements cover, and every problem we found in the source data.
+
+**Open a requirement.** The Decision Card shows the car part it is about, why the AI recommends it, and buttons to
+Approve, Validate first, Edit, Reject or Challenge. Its tabs hold the rest:
+
+- **Overview:** how much of the case rests on customer comments, survey data, AI inference and assumptions, plus
+  the chain from customer voice to requirement, and the assumptions and uncertainties.
+- **Evidence:** real customer quotes (supporting and contradicting) and survey results.
+- **Scoring:** each priority and confidence factor, with its weight and reason.
+- **Activity:** the audit trail for this requirement.
+
+**Challenge it.** Challenge runs a red-team check against the requirement. Confidence drops if the evidence is
+weaker than it looks, and the requirement can move from Act to Validate first.
+
+**Change the strategy.** Priority weights (with presets such as Customer first or China focus) re-rank the list
+live. Applying them needs a reason and is logged. Reset brings back the original ranking.
+
+**See across cars.** The top bar has two more views:
+
+- **Board:** every requirement across all three cars, by decision status, with counts, filters and a list view.
+- **Radar:** a heatmap of customer themes across the 1, 5 and 7 Series, recurring issues first.
+
+**Export.** Each car page exports the requirement list in BMW's format as CSV or JSON.
+
+**Talk to it.** The microphone at the bottom right starts a voice assistant. Ask it to open a car, explain a score,
+read customer quotes or challenge a requirement. It can propose a decision, but nothing changes until you click
+Confirm.
+
+**Check the record.** The Audit trail page lists every AI step, product manager decision and access to customer
+evidence, filterable by car and actor.
+
+## How it works
+
+```
+data/*.xlsx, *.PDF ──► pipeline/ (Python) ──► db/pmw.sqlite ──► web/ (Next.js) ──► product manager
+                                                   ▲                  │
+                                                   └── decisions and access events (audit_events)
+```
+
+| Step | Where | Who does it |
+|---|---|---|
+| Ingest the files and record data problems | `pipeline/pmw/ingest.py` | Pipeline |
+| Group comments into signals | `pipeline/pmw/signals.py` | Pipeline |
+| Cross-check with surveys, sales, equipment and markets | `pipeline/pmw/evidence.py` | Pipeline |
+| Remove out-of-scope topics, with a reason for each | `pipeline/pmw/scope.py` | Pipeline |
+| Draft the requirement | `pipeline/pmw/derive.py` | AI draft, never final |
+| Score priority and confidence | `pipeline/pmw/score.py` | Code, not the AI |
+| Approve, validate first, edit, reject, challenge | `web/lib/actions.ts` | **Product manager** |
+| Record what happened | `audit_events` table, `/audit` | Automatic, append-only |
+
+Two rules keep it honest. The AI writes the words, but the numbers come from code. And priority and confidence are
+scored separately: an important requirement with weak evidence goes to Validate first, not Act.
+
+## Regions instead of logins
+
+There is no login in this prototype. The region picker in the top bar decides what you can see. A market product
+manager sees customer comments from their own market only; summary scores are visible to everyone; "All markets"
+(head of product) sees everything. Every data read goes through `web/lib/gate.ts`, which applies the region and logs
+access to customer evidence. In production this would sit behind BMW single sign-on.
+
+## Run it locally
+
+You need Node 24, npm and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 # 1. Build the database (about 10 seconds)
 cd pipeline
 uv sync
-uv run pmw build --offline  # complete evidence drafts; no network generation
-uv run pmw verify          # citations, counts and deterministic scoring checks
-# uv sync --extra llm && ANTHROPIC_API_KEY=... uv run pmw build --llm   # AI mode, see below
+uv run pmw build --offline   # builds every table from the files in data/
+uv run pmw verify            # checks citations, counts and scores
 
-# 2. Run the web app
+# 2. Start the web app
 cd ../web
 npm ci
-npm run dev                 # http://localhost:3000
+npm run dev                  # http://localhost:3000
 ```
 
-Rebuilding wipes the database, including every PM decision. That is the clean demo state.
-After pulling changes to `pipeline/pmw/db.py`, rebuild: the build drops and recreates every table.
+A rebuild starts from a clean slate and wipes every decision made locally. Rebuild after pulling changes to
+`pipeline/pmw/db.py`, which is the schema shared by the pipeline and the web app.
 
-Equipment matches stay within the feature's allowed topics. Only `Wants` comments support option, package or
-cross-vehicle offers; complaints about standard equipment are marked `standard_but_failing`.
-Each vehicle keeps its 15 signal requirements plus up to five quick wins, ranked by distinct wishing comment IDs.
-G60 and G70 also include their three strongest in-scope China/Europe survey conflicts, with explicit market values,
-2025 sales shares and limited evidence confidence. These cards do not invent customer comments.
-Quick wins name the feature and option/package code or source vehicle, and use their own comments and scores.
-Comment IDs are the available counting unit; the source data does not identify unique people across comments.
+`uv run pmw build --llm` uses an LLM to label unclassified comments and draft requirement text (set the key and
+model in `pipeline/.env`, see `pipeline/.env.example`). Results are cached in `pipeline/cache/`. Without it, the
+pipeline uses evidence-based templates that are clearly marked as drafts.
 
-Schema update: `equipment_matches.feature` identifies the feature; the placeholder `equipment.trim` column was
-removed. Rebuild the database before running the updated app.
+## Voice
 
-Phase 2 adds `signal_feedback` (full negative-comment membership for live approval coverage) and `feedback_scope`
-(readable text exclusions). Rebuild before using this branch. The async `happiness(viewer, vehicle)` gate function
-returns authorized markets only and `share: null` when evidence is missing; the meter UI can consume it.
-Implementation notes: [Happiness data](docs/HAPPINESS_DATA.md), [survey and scope](docs/SURVEY_AND_SCOPE.md),
-[photos](docs/REQUIREMENT_PHOTOS.md), and [pitch data traps](docs/pitch/data-traps.md).
+The assistant picks the best option the server is set up for:
 
-Vishwa Phase 2 adds a region-aware evidence/assumption meter and `/portfolio`, a theme-by-vehicle heatmap with
-aggregate counts only. The additive `requirements.evidence_mix` and `evidence_mix_by_market` columns can be
-backfilled without replacing decisions: back up the existing database, then run `uv run pmw evidence-mix` from
-`pipeline`. A full rebuild is still needed to regenerate upstream source changes. See the [Phase 2 delivery and
-migration notes](docs/PHASE2_VISHWA.md) and [scoring pitch](docs/pitch/scoring.md).
+1. **OpenAI Realtime** when `OPENAI_API_KEY` is set. This is the main mode.
+2. **ElevenLabs conversational agent** when `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` are set. Create or update
+   the agent with `node --env-file=.env.local scripts/eleven-agent.ts` from `web/`.
+3. **Command mode** otherwise: the browser recognises a short command and PMW answers from a fixed set of actions.
 
-Regression checks: `cd pipeline && uv run --extra llm python -m unittest discover -s tests -v`, then
-`cd ../web && node --test scripts/test-equipment-evidence.mjs scripts/test-happiness.mjs scripts/test-score.mjs && npx tsc --noEmit && npm run build`.
-Run `npm run test:e2e` after building; it uses a separate copy of the local database.
+Keys stay on the server; the browser only gets short-lived session tokens. Whatever the mode, every action goes
+through the same region checks and audit trail, and decisions or challenges need a click on Confirm.
 
-**Priority display:** the list is grouped MoSCoW-style by priority score: Must have 65+, Should have 55+, Could have 45+,
-Won't have this time below 45 (`MOSCOW` in `web/components/ui.tsx`). The Act / Validate first / Monitor / Park chip is the
-separate decision quadrant (priority × confidence).
+For a noisy room, PMW ignores background talk while it is speaking (click the mic to stop it). Tune this with
+`OPENAI_VAD_THRESHOLD` (default 0.75), `OPENAI_NOISE_REDUCTION` (`far_field` for a laptop mic, `near_field` for a
+headset) and `OPENAI_VOICE_INTERRUPT=1` to allow interrupting by voice. Details: [docs/VOICE_COPILOT.md](docs/VOICE_COPILOT.md).
 
-**Priority weights and presets:** the "Priority weights" panel above the requirement list lets a product manager change
-how much each of the five priority factors counts (customer impact, frequency, market relevance, competitive pressure,
-future relevance), by slider or with a strategy preset: Customer first, Premium experience, Quick wins, China focus or
-Europe focus (defined and explained in `web/lib/score.ts`). A live preview shows how the top 5 would re-order before
-anything is saved. Apply needs a reason; the weights are stored team-wide in `settings.weights_active` and logged in the
-audit trail (who, region, before/after, why). While they are active, every page and export recomputes priority with the
-pipeline's formula, `round(100 × Σ weight·value / Σ weight)`, re-groups MoSCoW and re-derives the quadrant; confidence
-is never changed because it measures evidence, not strategy. The stored scores stay untouched, so Reset restores the
-original ranking exactly. `node --test scripts/test-score.mjs` proves the web formula reproduces every stored priority
-and quadrant under the default weights.
+Put local keys in `web/.env.local` (git-ignored). `web/.env.example` lists every setting.
 
-## Hosted demo
+## Tests
 
-Live at **https://product-minds-on-wheels.vercel.app** (Vercel project `product-minds-on-wheels`).
-
-- Online, the app reads and writes a hosted Turso database (SQLite in the cloud, free plan, added through the
-  Vercel Marketplace). Locally it uses `db/pmw.sqlite`. Same code, chosen in `web/lib/db.ts`.
-- Update the hosted data after a pipeline change: `cd web && vercel env pull .env.local && npm run db:push`.
-  This replaces everything online, including PM decisions made on the hosted demo.
-- Deploy code: `cd web && vercel deploy --prod`. The project is not connected to GitHub, so pushes do not deploy.
-- Search engines are kept out three ways (robots meta tag, `robots.txt`, `X-Robots-Tag` header). No analytics,
-  and the font is self-hosted, so visitors' browsers make no requests to third parties.
-
-## How it fits together
-
-```
-data/*.xlsx, *.PDF ─────► pipeline/ (Python) ──► db/pmw.sqlite ──► web/ (Next.js) ──► product manager
-                              │                        ▲                 │
-                              └── pipeline/cache/ ─────┘                 └── decisions + access events
-                                  (AI drafts, committed)                     written back to audit_events
+```bash
+cd pipeline && uv run --extra llm python -m unittest discover -s tests   # pipeline
+cd ../web
+npx tsc --noEmit && npm run lint && npm run build                        # types, lint, build
+npm run test:voice                                                       # voice unit tests
+npm run test:e2e                                                         # browser tests (after a build)
+node --test scripts/test-score.mjs scripts/test-happiness.mjs scripts/test-equipment-evidence.mjs
 ```
 
-| Step | Where | Who does it |
-|---|---|---|
-| 1 Ingest, record data problems | `pipeline/pmw/ingest.py` | AI pipeline, automatic |
-| 2 Signals (themes from comments) | `pipeline/pmw/signals.py` | AI pipeline, automatic |
-| 3 Triangulate (survey, sales, equipment, conflicts, missing voices) | `pipeline/pmw/evidence.py` | AI pipeline, automatic |
-| Scope guard | `pipeline/pmw/scope.py` | AI pipeline, automatic, every exclusion has a reason |
-| 4 Derive requirement (the ladder) | `pipeline/pmw/derive.py` | AI drafts, never final |
-| 5 Priority and confidence | `pipeline/pmw/score.py` | Deterministic code, not the LLM |
-| 6 Approve / validate first / edit / reject / challenge | `web/lib/actions.ts` | **Product manager, mandatory** |
-| 7 Audit trail | `audit_events` table, `/audit` page | Automatic, append-only |
+The browser tests use their own copy of the database and run without the voice keys, so they never touch the live
+site or use paid voice minutes.
 
-**Two rules that keep the system honest**
-- Language comes from AI, numbers come from code. Scores are never written by the model.
-- Priority and confidence are separate. High priority with weak evidence lands in **Validate first**, not **Act**.
+## Hosting
 
-## Regions instead of logins
+The live site runs on Vercel (project `product-minds-on-wheels`). Online it reads and writes a hosted Turso
+database; locally it uses `db/pmw.sqlite`. `web/lib/db.ts` picks between them.
 
-There is no login. The region picker in the header (top right) sets a cookie. A market product manager sees raw
-customer comments from their own market only; summary scores stay visible everywhere; the head of product
-(All markets) sees everything. All reads go through `web/lib/gate.ts`, which filters by region and logs access.
-In production this maps onto BMW single sign-on and database-level security.
+- **Deploy:** `cd web && vercel deploy --prod`. The project is not connected to GitHub, so a push does not deploy.
+- **Replace the live data** after a pipeline change: `cd web && vercel env pull .env.local && npm run db:push`.
+  This overwrites everything online, including decisions made on the live site.
+- **No tracking:** no analytics, a self-hosted font, and search engines are kept out (robots meta tag,
+  `robots.txt` and an `X-Robots-Tag` header). The voice assistant is the only part that talks to an outside
+  service, and only after you click the mic.
 
-## AI mode
-
-`uv run pmw build --llm` classifies unlabelled feedback, drafts requirements and explains challenges.
-Validated results are cached by their full inputs in `pipeline/cache/`; commit those files after a live run
-so teammates can replay them without a key. Model: set `PMW_MODEL` (and optionally `PMW_MODEL_FAST`) in
-`pipeline/.env`. `--offline` reads validated caches but prohibits network calls even if a key exists.
-Without a matching cache, the pipeline uses explicit evidence-based templates and provisional rule labels.
-Live-model caches are not included in the offline-first deliverable.
-
-Implementation, checks and limitations: [Vishwa pipeline handoff](docs/VISHWA_IMPLEMENTATION.md).
-
-Optional voice agent (OpenAI Realtime): [setup, tools and safety](docs/VOICE_COPILOT.md). Set the server-side `OPENAI_API_KEY` in `web/.env.local`, then click the small microphone at the bottom of any page to talk to PMW in English or German.
-
-## Repo map
+## Where things live
 
 ```
-data/                BMW hackathon files
-db/pmw.sqlite        built by the pipeline (git-ignored)
-pipeline/pmw/        Python pipeline; db.py is the schema = the contract with the web app
-pipeline/cache/      cached AI drafts (committed)
-web/lib/gate.ts      every data read, region filtering, access logging
-web/lib/actions.ts   every PM decision and its audit events
-web/app/             pages: / (home), /vehicles/[code] (requirements, matrix, signals, data health), /audit
-web/components/      UI; DecisionCard.tsx is the core screen
+data/                 BMW hackathon files
+db/pmw.sqlite         built by the pipeline (git-ignored)
+pipeline/pmw/         Python pipeline; db.py is the schema
+pipeline/cache/       cached AI drafts (committed)
+web/app/              pages: home, /vehicles/[code], /board, /portfolio (Radar), /workflow, /audit, and the API routes
+web/components/       UI; DecisionCard.tsx is the main screen
+web/lib/gate.ts       every data read, region filter and access log
+web/lib/actions.ts    every product manager decision and its audit entries
+web/lib/voice/        voice modes, tools and safety rules
+docs/                 implementation notes, voice guide, pitch material
 ```
 
-Team, ownership and workflow: [TEAM.md](TEAM.md).
+More detail: [team and workflow](TEAM.md), [plan](PLAN.md), [pitch deck and demo script](docs/pitch/),
+[data traps we found](docs/pitch/data-traps.md), [how scoring works](docs/pitch/scoring.md).
 
-**Note:** the repo contains BMW data and photography provided for the hackathon. Check the hackathon terms before keeping it public.
+**Note:** this repo contains BMW data and photography provided for the hackathon. Check the hackathon terms before
+keeping it public.
