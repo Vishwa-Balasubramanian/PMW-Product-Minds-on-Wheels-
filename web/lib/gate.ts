@@ -80,6 +80,46 @@ export async function getVehicle(code: string) {
   );
 }
 
+export type PortfolioCell = { vehicle: string; comments: number; negative: number; share: number | null };
+export type PortfolioTheme = { theme: string; recurring: boolean; cells: PortfolioCell[] };
+
+/** Global, aggregate-only view. No feedback text, IDs, or dominant-issue snippets are read. */
+export async function portfolio(): Promise<{
+  vehicles: { code: string; short: string }[]; themes: PortfolioTheme[]; recurring: number;
+}> {
+  const [vehicles, signals] = await Promise.all([
+    all<{ code: string; short: string }>("SELECT code, short FROM vehicles ORDER BY code"),
+    all<{ vehicle: string; topic: string; comments: number; negative: number }>(
+      `SELECT vehicle, topic, SUM(n_comments) AS comments, SUM(n_negative) AS negative
+       FROM signals WHERE in_scope=1 GROUP BY vehicle, topic`,
+    ),
+  ]);
+  const byTheme = new Map<string, Map<string, PortfolioCell>>();
+  for (const s of signals) {
+    const cells = byTheme.get(s.topic) ?? new Map<string, PortfolioCell>();
+    cells.set(s.vehicle, {
+      vehicle: s.vehicle,
+      comments: s.comments,
+      negative: s.negative,
+      share: s.comments > 0 ? s.negative / s.comments : null,
+    });
+    byTheme.set(s.topic, cells);
+  }
+  const themes = [...byTheme]
+    .map(([theme, cells]) => ({
+      theme,
+      recurring: [...cells.values()].filter((c) => c.negative > 0).length >= 2,
+      cells: vehicles.map((v) => cells.get(v.code) ?? { vehicle: v.code, comments: 0, negative: 0, share: null }),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.recurring) - Number(a.recurring) ||
+        b.cells.reduce((sum, c) => sum + c.negative, 0) - a.cells.reduce((sum, c) => sum + c.negative, 0) ||
+        a.theme.localeCompare(b.theme),
+    );
+  return { vehicles, themes, recurring: themes.filter((t) => t.recurring).length };
+}
+
 // ---------- requirements ----------
 
 function toRequirement(r: Row): Requirement {
