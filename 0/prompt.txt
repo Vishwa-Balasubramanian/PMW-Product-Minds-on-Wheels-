@@ -1,0 +1,25 @@
+This is from Vishwa's AI:
+
+
+<pasted_content id="be72">
+Your message, corrected: "Are the Kanban board and cards, along with the drag-and-drop feature, pushed or not? Check and tell me."
+
+Yes, they're pushed. I checked origin/feature_v on GitHub directly, and all the board files are there:
+
+File    What it is    On GitHub
+web/components/RequirementsBoard.tsx    The board, cards, drag and drop, "Move to…" menu, confirm dialogs    ✅
+web/components/BoardWorkspace.tsx    KPIs, filters, sidebar, drawer layout    ✅
+web/components/RequirementDrawer.tsx    The requirement detail panel    ✅
+web/lib/board.ts    The column and move rules    ✅
+web/tests/board.spec.ts    The board tests, including drag and drop    ✅
+The pushed board file contains the drag-and-drop code (draggable cards, drag start, drop).
+
+Not pushed yet: only today's merge with main (local commit 209fce9; your branch is 11 commits ahead of GitHub). It contains:
+
+Gokul's Happiness Meter and market-conflict cards
+the compact meter in the board sidebar
+the new "Market conflict" flag on board cards
+</pasted_content id="be72">
+
+
+Check the feature v branch for kanban
