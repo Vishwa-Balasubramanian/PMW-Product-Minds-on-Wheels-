@@ -1,0 +1,1 @@
+in our voice fatures, try to use the voice algorithms of this project: https://github.com/GokulRajan23/Minerva. Read it and see if you could find anything useful
