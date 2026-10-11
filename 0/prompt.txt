@@ -1,0 +1,1 @@
+Whenever I click on any must have requirements, the page scrolls to the top automatically. Why is that
