@@ -1,0 +1,5 @@
+Before we go ahead with anything. Clear these doubts:
+1. Should we build an app or a pipeline or a pipeline inside an app?
+2. Should it be a webapp or a normal app
+3. Why shuld we clean this data? Isnt this a sample data? or did the problem statement mention we use this data
+4. explain to me in a simple way what we are going to build
