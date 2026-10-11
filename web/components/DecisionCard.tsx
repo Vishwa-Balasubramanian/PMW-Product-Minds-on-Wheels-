@@ -4,6 +4,8 @@ import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, 
 import { AlreadySellBanner } from "./AlreadySellBanner";
 import { ConflictBlock } from "./ConflictBlock";
 import { DecisionActions } from "./DecisionActions";
+import { EvidenceMeter } from "./EvidenceMeter";
+import { ReviewTabs } from "./ReviewTabs";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
 /** Who drafted the requirement. Only output from an actual model is called an AI draft. */
@@ -145,76 +147,82 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
         </section>
       )}
 
-      <Section title="From customer voice to requirement">
-        <Ladder r={r} />
-      </Section>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Priority" aside="How important">
-          <div className="mb-5"><ScorePair r={r} size="lg" /></div>
-          <FactorBars factors={r.priority_factors} labels={labels} />
-        </Section>
-        <Section title="Confidence" aside="How well proven">
-          <FactorBars factors={r.confidence_factors} labels={labels} />
-          <div className="mt-6">
-            <Matrix items={siblings} thresholds={thresholds} vehicle={r.vehicle} selected={r.id} size={420} />
+      {/* Tabs keep the card short; Approve, Challenge and the photo header stay above them. */}
+      <ReviewTabs key={r.id}
+        overview={<>
+          <EvidenceMeter mix={r.evidence_mix} region={viewer.label} />
+          <Section title="From customer voice to requirement">
+            <Ladder r={r} />
+          </Section>
+          <Section title="Assumptions, uncertainties, contradictions">
+            <ul className="flex flex-col gap-2 text-[14px]">
+              {r.assumptions.map((a) => <li key={a}><span className="mr-2 bg-validate-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-validate">Assumption</span>{a}</li>)}
+              {r.uncertainties.map((a) => <li key={a}><span className="mr-2 bg-monitor-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-monitor">Uncertainty</span>{a}</li>)}
+              {r.contradictions.map((a) => <li key={a}><span className="mr-2 bg-danger-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-danger">Contradiction</span>{a}</li>)}
+            </ul>
+          </Section>
+        </>}
+        evidence={<>
+          <Section title="Customer evidence" aside={`${supports.length} supporting · ${contradicts.length} contradicting · visible to ${viewer.label}`}>
+            {hiddenTotal > 0 && (
+              <p className="mb-4 border border-dashed border-line bg-mist px-4 py-3 text-[14px] text-ink-2">
+                {Object.entries(hidden).map(([m, n]) => `${n} comment${n === 1 ? "" : "s"} from ${MARKET_LABEL[m] ?? m}`).join(", ")} restricted to
+                {" "}{Object.keys(hidden).length > 1 ? "those markets'" : "that market's"} product managers and the head of product. This access was logged.
+              </p>
+            )}
+            {supports.length === 0 && hiddenTotal === 0 && <p className="text-[14px] text-ink-3">No customer comments. This requirement rests on survey evidence only.</p>}
+            <ul className="flex flex-col gap-4">{supports.slice(0, 8).map((q) => <QuoteItem key={q.id} q={q} />)}</ul>
+            {contradicts.length > 0 && (
+              <>
+                <h4 className="eyebrow mt-6 mb-3">Customers who disagree</h4>
+                <ul className="flex flex-col gap-4">{contradicts.slice(0, 3).map((q) => <QuoteItem key={q.id} q={q} />)}</ul>
+              </>
+            )}
+          </Section>
+          <Section title="Survey evidence" aside="US: share of lowest answers · CN/EU: mean of 10">
+            {r.survey.length === 0 ? (
+              <p className="text-[14px] text-ink-3">No survey question maps to this topic yet.</p>
+            ) : (
+              <table className="w-full text-[13px]">
+                <tbody>
+                  {r.survey.map((s) => (
+                    <tr key={s.study + s.market + s.attribute} className="border-t border-line first:border-t-0">
+                      <td className="py-2 pr-3">{s.attribute}{s.variant ? ` (${s.variant})` : ""}</td>
+                      <td className="py-2 pr-3 text-ink-3">{MARKET_LABEL[s.market]}</td>
+                      <td className="py-2 text-right tabular-nums">{s.scale === 7 ? `${Math.round((s.bottom3 ?? 0) * 1000) / 10}% negative` : `${s.mean} / 10`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {r.conflicts.length > 0 && (
+              <div className="mt-4 border-l-2 border-validate bg-validate-soft px-4 py-3 text-[14px]">
+                <b>Markets disagree.</b>{" "}
+                {r.conflicts.map((c) => `${c.attribute}: China ${c.cn} vs Europe ${c.eu}`).join("; ")}. Decide whether this is a global or a market-specific requirement.
+              </div>
+            )}
+          </Section>
+        </>}
+        scoring={
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Section title="Priority" aside="How important">
+              <div className="mb-5"><ScorePair r={r} size="lg" /></div>
+              <FactorBars factors={r.priority_factors} labels={labels} />
+            </Section>
+            <Section title="Confidence" aside="How well proven">
+              <FactorBars factors={r.confidence_factors} labels={labels} />
+              <div className="mt-6">
+                <Matrix items={siblings} thresholds={thresholds} vehicle={r.vehicle} selected={r.id} size={420} />
+              </div>
+            </Section>
           </div>
-        </Section>
-      </div>
-
-      <Section title="Customer evidence" aside={`${supports.length} supporting · ${contradicts.length} contradicting · visible to ${viewer.label}`}>
-        {hiddenTotal > 0 && (
-          <p className="mb-4 border border-dashed border-line bg-mist px-4 py-3 text-[14px] text-ink-2">
-            {Object.entries(hidden).map(([m, n]) => `${n} comment${n === 1 ? "" : "s"} from ${MARKET_LABEL[m] ?? m}`).join(", ")} restricted to
-            {" "}{Object.keys(hidden).length > 1 ? "those markets'" : "that market's"} product managers and the head of product. This access was logged.
-          </p>
-        )}
-        {supports.length === 0 && hiddenTotal === 0 && <p className="text-[14px] text-ink-3">No customer comments. This requirement rests on survey evidence only.</p>}
-        <ul className="flex flex-col gap-4">{supports.slice(0, 8).map((q) => <QuoteItem key={q.id} q={q} />)}</ul>
-        {contradicts.length > 0 && (
-          <>
-            <h4 className="eyebrow mt-6 mb-3">Customers who disagree</h4>
-            <ul className="flex flex-col gap-4">{contradicts.slice(0, 3).map((q) => <QuoteItem key={q.id} q={q} />)}</ul>
-          </>
-        )}
-      </Section>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Survey evidence" aside="US: share of lowest answers · CN/EU: mean of 10">
-          {r.survey.length === 0 ? (
-            <p className="text-[14px] text-ink-3">No survey question maps to this topic yet.</p>
-          ) : (
-            <table className="w-full text-[13px]">
-              <tbody>
-                {r.survey.map((s) => (
-                  <tr key={s.study + s.market + s.attribute} className="border-t border-line first:border-t-0">
-                    <td className="py-2 pr-3">{s.attribute}{s.variant ? ` (${s.variant})` : ""}</td>
-                    <td className="py-2 pr-3 text-ink-3">{MARKET_LABEL[s.market]}</td>
-                    <td className="py-2 text-right tabular-nums">{s.scale === 7 ? `${Math.round((s.bottom3 ?? 0) * 1000) / 10}% negative` : `${s.mean} / 10`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {r.conflicts.length > 0 && (
-            <div className="mt-4 border-l-2 border-validate bg-validate-soft px-4 py-3 text-[14px]">
-              <b>Markets disagree.</b>{" "}
-              {r.conflicts.map((c) => `${c.attribute}: China ${c.cn} vs Europe ${c.eu}`).join("; ")}. Decide whether this is a global or a market-specific requirement.
-            </div>
-          )}
-        </Section>
-        <Section title="Assumptions, uncertainties, contradictions">
-          <ul className="flex flex-col gap-2 text-[14px]">
-            {r.assumptions.map((a) => <li key={a}><span className="mr-2 bg-validate-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-validate">Assumption</span>{a}</li>)}
-            {r.uncertainties.map((a) => <li key={a}><span className="mr-2 bg-monitor-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-monitor">Uncertainty</span>{a}</li>)}
-            {r.contradictions.map((a) => <li key={a}><span className="mr-2 bg-danger-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase text-danger">Contradiction</span>{a}</li>)}
-          </ul>
-        </Section>
-      </div>
-
-      <Section title="Audit trail" aside="Who, when, what changed and why">
-        <AuditTimeline events={events} />
-      </Section>
+        }
+        activity={
+          <Section title="Audit trail" aside="Who, when, what changed and why">
+            <AuditTimeline events={events} />
+          </Section>
+        }
+      />
     </article>
   );
 }

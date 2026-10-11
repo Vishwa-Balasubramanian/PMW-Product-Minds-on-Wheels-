@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
-import { getViewer, workflowStats } from "@/lib/gate";
+import { workflowStats } from "@/lib/gate";
 import { QUADRANT, type Quadrant } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +37,7 @@ function Stat({ value, label, dark = false }: { value: string | number; label: s
 }
 
 export default async function WorkflowPage() {
-  const [viewer, s] = await Promise.all([getViewer(), workflowStats()]);
+  const s = await workflowStats();
 
   const steps: { owner: Owner; title: string; text: string; files: string; stats: { value: string | number; label: string }[] }[] = [
     {
@@ -101,7 +100,6 @@ export default async function WorkflowPage() {
 
   return (
     <main className="flex-1">
-      <Header viewer={viewer} />
 
       <section className="container-x py-14">
         <p className="eyebrow">How PMW works · BMW deliverable 3</p>

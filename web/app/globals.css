@@ -101,3 +101,41 @@ b, strong { font-weight: 700; }
 @utility btn-sm { height: 2.5rem; padding-inline: 1rem; font-size: 13px; }
 @utility card { background: var(--bmw-bg); border: 1px solid var(--bmw-line); }
 @utility container-x { margin-inline: auto; width: 100%; max-width: 1280px; padding-inline: 1rem; @media (width >= 40rem) { padding-inline: 2rem; } @media (width >= 64rem) { padding-inline: 3rem; } }
+
+/* Decision Card tabs (Overview / Evidence / Scoring / Activity): same look as the vehicle view tabs. */
+.review-tablist { display: flex; gap: 28px; border-bottom: 1px solid var(--color-line); overflow-x: auto; }
+.review-tablist button { padding: 12px 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink-3); white-space: nowrap; }
+.review-tablist button:hover { color: var(--color-ink); }
+.review-tablist button[aria-selected=true] { color: var(--color-ink); border-color: var(--color-blue); }
+.review-tabpanel:not([hidden]) { display: flex; flex-direction: column; gap: 24px; padding-top: 24px; }
+.review-tabpanel p { overflow-wrap: anywhere; }
+
+/* Voice agent: one microphone, bottom right. Square panels, BMW Blue only. */
+.voice-agent { position: fixed; right: 24px; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 60; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
+.voice-mic { position: relative; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--color-blue); pointer-events: auto; transition: background-color .15s ease, transform .15s ease; }
+.voice-mic:hover { background: var(--color-blue-dark); }
+.voice-mic:active { transform: scale(.96); }
+.voice-mic svg, .voice-bars { position: relative; z-index: 1; }
+.voice-glow { position: absolute; inset: -6px; z-index: 0; border-radius: 50%; background: var(--color-blue); opacity: 0; transition: opacity .3s ease; }
+.voice-agent[data-state=connecting] .voice-glow { opacity: .25; animation: voice-breathe 1.4s ease-in-out infinite; }
+.voice-agent[data-state=listening] .voice-glow { opacity: .2; animation: voice-breathe 2.4s ease-in-out infinite; }
+.voice-agent[data-state=hearing] .voice-glow, .voice-agent[data-state=speaking] .voice-glow { opacity: .35; animation: voice-breathe 1s ease-in-out infinite; }
+.voice-bars { display: flex; align-items: center; gap: 3px; height: 20px; }
+.voice-bars i { width: 3px; height: 100%; background: #fff; transform: scaleY(.3); animation: voice-wave 1.6s ease-in-out infinite; }
+.voice-bars i:nth-child(2) { animation-delay: -.3s; }
+.voice-bars i:nth-child(3) { animation-delay: -.6s; }
+.voice-bars i:nth-child(4) { animation-delay: -.9s; }
+.voice-agent[data-state=hearing] .voice-bars i, .voice-agent[data-state=speaking] .voice-bars i { animation-duration: .7s; }
+.voice-error, .voice-progress { max-width: min(320px, calc(100vw - 48px)); margin-bottom: 10px; padding: 8px 12px; background: #fff; border: 1px solid var(--color-line); font-size: 12px; line-height: 1.4; animation: voice-appear .2s ease-out; }
+.voice-error { color: var(--color-danger); pointer-events: auto; }
+.voice-progress { color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice-progress::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; background: var(--color-blue); vertical-align: middle; animation: voice-breathe 1.2s ease-in-out infinite; }
+.voice-confirm { margin: auto; padding: 24px; border: 1px solid var(--color-line); width: min(480px, calc(100vw - 32px)); color: var(--color-ink); }
+.voice-confirm h2 { font-size: 20px; font-weight: 300; }
+.voice-confirm::backdrop { background: rgb(38 38 38 / 0.5); }
+.voice-rationale { margin-top: 12px; padding: 8px 10px; border-left: 2px solid var(--color-blue); background: var(--color-monitor-soft); font-size: 13px; color: var(--color-ink-2); }
+@keyframes voice-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes voice-breathe { 50% { opacity: .1; transform: scale(.92); } }
+@keyframes voice-wave { 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .voice-glow, .voice-bars i, .voice-error, .voice-progress, .voice-progress::before { animation: none !important; } }
+@media (max-width: 640px) { .voice-agent { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); } .voice-mic { width: 48px; height: 48px; } }

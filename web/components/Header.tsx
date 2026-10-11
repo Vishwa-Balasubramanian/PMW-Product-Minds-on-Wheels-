@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Viewer } from "@/lib/gate";
 import { BrandLogo } from "./BrandLogo";
 import { RegionPicker } from "./RegionPicker";
+import { MobileNav } from "./Sidebar";
 
 /** Our own PMW wordmark: "P" in BMW Blue, "MW" in dark grey. Never combined into the BMW logo. */
 export function Wordmark() {
@@ -15,31 +16,18 @@ export function Wordmark() {
   );
 }
 
-const NAV = [
-  { href: "/vehicles/G70", label: "7 Series" },
-  { href: "/vehicles/G60", label: "5 Series" },
-  { href: "/vehicles/F70", label: "1 Series" },
-  { href: "/workflow", label: "Workflow" },
-  { href: "/audit", label: "Audit trail" },
-];
 
-/** White 72px header: BMW logo (provided file), divider, PMW wordmark, nav, region picker, prototype label. */
+/** White 72px header: BMW logo (provided file), divider, PMW wordmark, region picker, prototype label. Navigation lives in the Sidebar. */
 export function Header({ viewer }: { viewer: Viewer; variant?: "overlay" | "solid" }) {
   return (
-    <header className="sticky top-0 z-30 bg-white">
-      <div className="container-x">
-        <div className="flex h-[72px] items-center gap-6 border-b border-line">
+    <header className="sticky top-0 z-30 border-b border-line bg-white">
+      <div className="px-4 sm:px-8 lg:px-12">
+        <div className="flex h-[71px] items-center gap-6">
           <div className="flex items-center gap-4">
+            <MobileNav />
             <BrandLogo />
             <Wordmark />
           </div>
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-[13px] font-bold uppercase tracking-[0.05em] text-ink hover:text-blue">
-                {n.label}
-              </Link>
-            ))}
-          </nav>
           <div className="ml-auto flex items-center gap-6">
             <RegionPicker region={viewer.region} />
             <span className="hidden text-[11px] text-ink-3 xl:inline">for BMW Group · Hackathon Prototype</span>
