@@ -4,7 +4,7 @@ import { DecisionCard } from "@/components/DecisionCard";
 import { Header } from "@/components/Header";
 import { ScrollToCard } from "@/components/ScrollToCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
+import { ConflictBadge, MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
@@ -31,15 +31,17 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   if (!vehicle) notFound();
   const viewer = await getViewer();
   const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
-  // List filter: a quadrant, or "quick" for quick wins (equipment BMW already sells).
-  const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
+  // List filter: a quadrant, "quick" for quick wins (equipment BMW already sells) or "conflict" for market conflict cards.
+  const qFilter = sp.q === "quick" || sp.q === "conflict" ? sp.q
+    : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
     listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(),
     storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
-  const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const conflicts = all.filter((r) => r.kind === "market_conflict");
+  const reqs = qFilter === "quick" ? quickWins : qFilter === "conflict" ? conflicts : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
@@ -152,6 +154,14 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             >
               Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
             </Link>
+            <Link
+              href={`/vehicles/${code}?q=conflict`}
+              scroll={false}
+              title="China and Europe rate this differently: global or market-specific requirement?"
+              className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === "conflict" ? "border-validate bg-validate text-white" : "border-validate text-validate hover:bg-validate-soft"}`}
+            >
+              Conflicts <span className="tabular-nums opacity-70">{conflicts.length}</span>
+            </Link>
           </div>
           {active && (
             <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
@@ -164,7 +174,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
           </div>
           <div className="flex flex-col overflow-y-auto">
-            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No {qFilter === "quick" ? "quick wins" : "requirements"} with evidence in {viewer.label}.</p>}
+            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No {qFilter === "quick" ? "quick wins" : qFilter === "conflict" ? "market conflicts" : "requirements"} with evidence in {viewer.label}.</p>}
             {MOSCOW.map((m, gi) => {
               const next = MOSCOW[gi - 1]?.min ?? 101;
               const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
@@ -193,6 +203,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                               {r.aspect && <span>{r.aspect} · {r.part}</span>}
                               <QuadrantBadge q={r.quadrant} />
                               {r.kind === "quick_win" && <QuickWinBadge />}
+                              {r.kind === "market_conflict" && <ConflictBadge />}
                               {r.status !== "proposed" && <StatusBadge s={r.status} />}
                             </span>
                           </Link>
