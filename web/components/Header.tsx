@@ -10,7 +10,7 @@ export function Wordmark() {
       <span className="text-[22px] font-bold uppercase tracking-[0.02em] leading-none">
         <span className="pmw-p text-blue">P</span><span>MW</span>
       </span>
-      <span className="hidden text-[12px] font-light text-ink-3 sm:inline">Product Minds on Wheels</span>
+      <span className="hidden whitespace-nowrap text-[12px] font-light text-ink-3 sm:inline">Product Minds on Wheels</span>
     </Link>
   );
 }
@@ -19,6 +19,7 @@ const NAV = [
   { href: "/vehicles/G70", label: "7 Series" },
   { href: "/vehicles/G60", label: "5 Series" },
   { href: "/vehicles/F70", label: "1 Series" },
+  { href: "/portfolio", label: "Radar" },
   { href: "/workflow", label: "Workflow" },
   { href: "/audit", label: "Audit trail" },
 ];
@@ -33,14 +34,14 @@ export function Header({ viewer }: { viewer: Viewer; variant?: "overlay" | "soli
             <BrandLogo />
             <Wordmark />
           </div>
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
+          <nav className="hidden items-center gap-5 md:flex" aria-label="Main">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="text-[13px] font-bold uppercase tracking-[0.05em] text-ink hover:text-blue">
+              <Link key={n.href} href={n.href} className="whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.05em] text-ink hover:text-blue">
                 {n.label}
               </Link>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-6">
+          <div className="ml-auto flex shrink-0 items-center gap-6 whitespace-nowrap">
             <RegionPicker region={viewer.region} />
             <span className="hidden text-[11px] text-ink-3 xl:inline">for BMW Group · Hackathon Prototype</span>
           </div>
