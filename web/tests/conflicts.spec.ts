@@ -8,7 +8,7 @@ const base = 'http://127.0.0.1:3107';
 
 /** Requirement IDs of the rows currently listed. */
 const listed = (page: import('@playwright/test').Page) =>
-  page.locator('aside li a').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+  page.getByTestId('requirement-card').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
 
 test('conflicts chip lists market conflict cards per region; US sees none', async ({ page, context }) => {
   const con = db();
@@ -22,9 +22,9 @@ test('conflicts chip lists market conflict cards per region; US sees none', asyn
       await expect(page.getByRole('link', { name: `Conflicts ${conflicts.length}`, exact: true })).toBeVisible();
       await page.getByRole('link', { name: `Conflicts ${conflicts.length}`, exact: true }).click();
       await expect(page).toHaveURL(/[?&]q=conflict/);
-      await expect(page.locator('aside li a')).toHaveCount(conflicts.length);
+      await expect(page.getByTestId('requirement-card')).toHaveCount(conflicts.length);
       expect((await listed(page)).sort()).toEqual(conflicts);
-      await expect(page.locator('aside li').getByText('Market conflict', { exact: true })).toHaveCount(conflicts.length);
+      await expect(page.getByTestId('requirements-board').getByText('Market conflict', { exact: true })).toHaveCount(conflicts.length);
     }
 
     await context.addCookies([{ name: 'pmw_region', value: 'US', url: base }]);

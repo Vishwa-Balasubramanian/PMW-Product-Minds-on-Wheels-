@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { Header } from "@/components/Header";
+import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
 import { ScrollToCard } from "@/components/ScrollToCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { ConflictBadge, MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
+import { Matrix, QuadrantBadge, Section } from "@/components/ui";
 import {
   auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
@@ -42,7 +43,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
   const conflicts = all.filter((r) => r.kind === "market_conflict");
-  const reqs = qFilter === "quick" ? quickWins : qFilter === "conflict" ? conflicts : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const search = view === "inbox" && typeof sp.search === "string" ? sp.search.trim().slice(0, 256) : "";
+  const filtered = qFilter === "quick" ? quickWins : qFilter === "conflict" ? conflicts : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const reqs = search ? filtered.filter((r) => r.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) : filtered;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
@@ -134,92 +137,24 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
     const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
-      <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-3 lg:sticky lg:top-[140px] lg:max-h-[calc(100vh-170px)] lg:self-start">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter requirements">
-            {([null, "act", "validate", "monitor", "park"] as const).map((q) => (
-              <Link
-                key={q ?? "all"}
-                href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
-                scroll={false}
-                className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === q ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink"}`}
-              >
-                {q ? QUADRANT[q].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
-              </Link>
-            ))}
-            <Link
-              href={`/vehicles/${code}?q=quick`}
-              scroll={false}
-              title="Customers ask for equipment BMW already sells"
-              className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === "quick" ? "border-blue bg-blue text-white" : "border-blue text-blue hover:bg-monitor-soft"}`}
-            >
-              Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
-            </Link>
-            <Link
-              href={`/vehicles/${code}?q=conflict`}
-              scroll={false}
-              title="China and Europe rate this differently: global or market-specific requirement?"
-              className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === "conflict" ? "border-validate bg-validate text-white" : "border-validate text-validate hover:bg-validate-soft"}`}
-            >
-              Conflicts <span className="tabular-nums opacity-70">{conflicts.length}</span>
-            </Link>
-          </div>
-          {active && (
-            <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
-              <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
-              <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
-            </p>
-          )}
-          <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
-            <h2 className="whitespace-nowrap text-[15px] font-semibold">Ranked by priority</h2>
-            <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
-          </div>
-          <div className="flex flex-col overflow-y-auto">
-            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No {qFilter === "quick" ? "quick wins" : qFilter === "conflict" ? "market conflicts" : "requirements"} with evidence in {viewer.label}.</p>}
-            {MOSCOW.map((m, gi) => {
-              const next = MOSCOW[gi - 1]?.min ?? 101;
-              const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
-              if (!rows.length) return null;
-              return (
-                <section key={m.key} aria-label={m.label} className="border-b border-line pb-2">
-                  <div className="flex items-baseline justify-between gap-2 px-3 pt-4 pb-1">
-                    <h3 className={`text-[12px] font-bold uppercase tracking-[0.1em] ${m.text}`}>{m.label}</h3>
-                    <span className="text-[12px] text-ink-3">{rows.length} · {m.hint}</span>
-                  </div>
-                  <ul>
-                    {rows.map((r) => {
-                      const on = r.id === selectedId;
-                      return (
-                        <li key={r.id}>
-                          <Link
-                            href={`/vehicles/${code}?${qFilter ? `q=${qFilter}&` : ""}req=${r.id}`}
-                            scroll={false}
-                            aria-label={`${m.label}, priority ${r.priority}: ${r.title}`}
-                            className={`relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 py-2.5 pr-3 pl-7 ${on ? "bg-monitor-soft shadow-[inset_3px_0_0_var(--color-blue)]" : "hover:bg-mist"}`}
-                          >
-                            <span className={`absolute left-3 top-[17px] h-[5px] w-[5px] ${m.dot}`} aria-hidden="true" />
-                            <span className="text-[15px] font-normal leading-snug text-ink">{r.title}</span>
-                            <span className="row-span-2 self-center text-[16px] font-semibold tabular-nums">{r.priority}</span>
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
-                              {r.aspect && <span>{r.aspect} · {r.part}</span>}
-                              <QuadrantBadge q={r.quadrant} />
-                              {r.kind === "quick_win" && <QuickWinBadge />}
-                              {r.kind === "market_conflict" && <ConflictBadge />}
-                              {r.status !== "proposed" && <StatusBadge s={r.status} />}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        </aside>
+      <div className="flex flex-col">
+        {active && (
+          <p className="mb-4 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
+            <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
+            <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+          </p>
+        )}
+        <BoardToolbar all={all} vehicle={code} filter={qFilter} search={search} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        {/* Desktop: the board stays in view beside the Decision Card, like an inbox. Phone: board, then card. */}
+        <div className="min-w-0 lg:sticky lg:top-[145px] lg:flex lg:h-[calc(100vh-170px)] lg:flex-col lg:self-start">
+          <RequirementsBoard items={reqs} vehicle={code} filter={qFilter} search={search} selected={selectedId} region={viewer.label} />
+        </div>
         <div id="decision-card" className="min-w-0 scroll-mt-[145px]">
           {detail && <ScrollToCard targetId="decision-card" selected={detail.requirement.id} />}
           {detail ? (
+            <>
+            <a href={`${requirementBoardHref(code, qFilter, search)}#requirements-board`} className="mb-4 inline-flex text-[13px] font-medium text-blue hover:underline lg:hidden">← Back to requirements board</a>
             <DecisionCard
               r={detail.requirement}
               quotes={detail.quotes}
@@ -230,9 +165,11 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               viewer={viewer}
               siblings={all}
             />
+            </>
           ) : (
             <p className="text-ink-3">Select a requirement.</p>
           )}
+        </div>
         </div>
       </div>
     );

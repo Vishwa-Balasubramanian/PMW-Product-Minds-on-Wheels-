@@ -80,7 +80,7 @@ test('quick wins filter and "You already sell this" banner keep comment IDs insi
 
     await page.goto(`/vehicles/G60?q=quick&req=${r.id}`);
     await expect(page.getByRole('link', { name: `Quick wins ${quickWins.length}` })).toBeVisible();
-    const rows = await page.locator('aside li a').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+    const rows = await page.getByTestId('requirement-card').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
     expect(rows.sort()).toEqual([...quickWins].sort());
 
     const banner = page.locator('section[aria-labelledby="already-sell-title"]');
@@ -191,7 +191,7 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
     await page.goto(`/vehicles/G60?req=${rows[0].id}`);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByLabel('Title', { exact: true }).fill('Unsaved text from a different requirement');
-    await page.locator(`aside a[href$="req=${rows[1].id}"]`).click();
+    await page.getByTestId('requirement-card').filter({ hasText: rows[1].title }).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue(rows[1].title);
