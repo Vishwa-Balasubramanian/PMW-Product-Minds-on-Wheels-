@@ -1,0 +1,6 @@
+I am at the EHL hackathon. There are three problem statements. BMW, Atira and Tacto. I will attach  the link for the following.
+'/Users/speak2gokul01/Downloads/BMW_Hackathon_Briefing_Short.pdf'
+2. https://arena.tacto.ai/
+3. https://ehl-challenge.atira.ai/
+
+I need you to use your agent browser skill to analyse and do an extensive reserch on all three of these problem statements and suggest which of the statement should I take and start in this hackathon
