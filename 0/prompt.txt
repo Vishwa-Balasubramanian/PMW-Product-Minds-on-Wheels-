@@ -1,0 +1,11 @@
+Ok these are the decisions:
+1. In the demo, I will explain the 7 series but not a specific 7 series
+2. Custom web app
+3. No login. Just the region selection like how it is done in Amazon. I will explain the login during my presentation
+4. Separate
+5. Product Minds on Wheels
+
+Now Also th intro feels cartoonish. I want it to look realistic. Use the realistic cars images fro  those pdfs or fetch from the bmw website.
+I want the entire webspp to feel very similar to this site: https://www.bmw.de/de/home.html
+
+Now I want you to build a base webapp using the pipeline you mentioned. 3 of us are going to work on it. After building the base webapp, we will push it to github and Vishwa and Arjun and I can start working on it simultaneously. Also assign jobs for each if us.
