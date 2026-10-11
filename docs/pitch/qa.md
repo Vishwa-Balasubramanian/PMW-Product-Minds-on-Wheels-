@@ -136,7 +136,7 @@ title for "ventilated front seats" names the Executive Paket, which holds rear-s
 both rows, rear and front, so a product manager would catch it. We found it ourselves and it is flagged for a fix.
 
 <!-- pipeline/pmw/evidence.py build_equipment_matches(): Wants -> option/package/standard_other_vehicle,
-     Difficult to Use/Defect -> standard_but_failing. 
+     Difficult to Use/Defect -> standard_but_failing.
      SELECT name, package FROM equipment WHERE vehicle='G70' AND package='Executive Paket';  -> "Aktive Sitzbelüftung im Fond" (rear)
      Front ventilation: "Aktive Sitzbelüftung vorn", CONNOISSEUR PAKET 9DC €3,200 (equipment_matches note).
      If the fix lands before the pitch, shorten the last two sentences. -->

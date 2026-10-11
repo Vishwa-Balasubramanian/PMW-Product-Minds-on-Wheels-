@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
-import { getViewer, workflowStats } from "@/lib/gate";
+import { workflowStats } from "@/lib/gate";
 import { QUADRANT, type Quadrant } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +37,7 @@ function Stat({ value, label, dark = false }: { value: string | number; label: s
 }
 
 export default async function WorkflowPage() {
-  const [viewer, s] = await Promise.all([getViewer(), workflowStats()]);
+  const s = await workflowStats();
 
   const steps: { owner: Owner; title: string; text: string; files: string; stats: { value: string | number; label: string }[] }[] = [
     {
@@ -100,15 +99,14 @@ export default async function WorkflowPage() {
   ];
 
   return (
-    <main className="flex-1">
-      <Header viewer={viewer} />
+    <div className="page-content">
 
-      <section className="container-x py-14">
+      <section className="py-5">
         <p className="eyebrow">How PMW works · BMW deliverable 3</p>
-        <h1 className="headline mt-3 max-w-[900px] text-[36px] sm:text-[48px]">
+        <h1 className="page-heading mt-3 max-w-[900px]">
           From customer voice to a decision a product manager can defend.
         </h1>
-        <p className="mt-5 max-w-[720px] text-[17px] text-ink-2">
+        <p className="mt-3 max-w-[720px] text-[14px] text-ink-2">
           Six steps run automatically and prepare the evidence. One step belongs to the product manager and cannot be skipped.
           Every step is recorded. The numbers below are live from the database.
         </p>
@@ -121,13 +119,13 @@ export default async function WorkflowPage() {
       </section>
 
       <section className="bg-mist">
-        <div className="container-x grid gap-px py-10 sm:grid-cols-3">
+        <div className="grid gap-3 py-4 sm:grid-cols-3">
           {[
             { t: "The AI drafts. It never decides.", d: "AI output is always a proposal, labelled as needing validation, until a product manager acts on it." },
             { t: "Numbers come from code.", d: "Priority, confidence and every count are computed by formulas anyone can check, never written by the model." },
             { t: "Every step is recorded.", d: "AI steps, decisions, edits and every access to customer evidence go into an append-only audit trail." },
           ].map((p) => (
-            <div key={p.t} className="bg-white p-6">
+            <div key={p.t} className="card p-5">
               <h2 className="text-[20px] font-light leading-snug">{p.t}</h2>
               <p className="mt-2 text-[14px] text-ink-2">{p.d}</p>
             </div>
@@ -135,7 +133,7 @@ export default async function WorkflowPage() {
         </div>
       </section>
 
-      <section className="container-x py-14">
+      <section className="py-5">
         <ol className="flex flex-col">
           {steps.map((step, i) => (
             <li key={step.title} className="grid gap-5 border-t border-line py-8 md:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)]">
@@ -198,6 +196,6 @@ export default async function WorkflowPage() {
           </li>
         </ol>
       </section>
-    </main>
+    </div>
   );
 }

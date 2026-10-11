@@ -8,7 +8,7 @@ const base = 'http://127.0.0.1:3107';
 
 /** Requirement IDs of the rows currently listed. */
 const listed = (page: import('@playwright/test').Page) =>
-  page.getByTestId('requirement-card').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+  page.locator('.requirement-row').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
 
 test('conflicts chip lists market conflict cards per region; US sees none', async ({ page, context }) => {
   const con = db();
@@ -18,17 +18,17 @@ test('conflicts chip lists market conflict cards per region; US sees none', asyn
     expect(conflicts.length).toBe(3);
     for (const region of ['ALL', 'CN']) {
       await context.addCookies([{ name: 'pmw_region', value: region, url: base }]);
-      await page.goto('/vehicles/G70');
+      await page.goto('/vehicles/G70?view=inbox');
       await expect(page.getByRole('link', { name: `Conflicts ${conflicts.length}`, exact: true })).toBeVisible();
       await page.getByRole('link', { name: `Conflicts ${conflicts.length}`, exact: true }).click();
       await expect(page).toHaveURL(/[?&]q=conflict/);
-      await expect(page.getByTestId('requirement-card')).toHaveCount(conflicts.length);
+      await expect(page.locator('.requirement-row')).toHaveCount(conflicts.length);
       expect((await listed(page)).sort()).toEqual(conflicts);
-      await expect(page.getByTestId('requirements-board').getByText('Market conflict', { exact: true })).toHaveCount(conflicts.length);
+      await expect(page.locator('.requirement-rows').getByText('Market conflict', { exact: true })).toHaveCount(conflicts.length);
     }
 
     await context.addCookies([{ name: 'pmw_region', value: 'US', url: base }]);
-    await page.goto('/vehicles/G70');
+    await page.goto('/vehicles/G70?view=inbox');
     await expect(page.getByRole('link', { name: 'Conflicts 0', exact: true })).toBeVisible();
     for (const id of conflicts) expect(await listed(page)).not.toContain(id);
     await page.goto('/vehicles/G70?q=conflict');

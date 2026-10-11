@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BoardWorkspace } from "@/components/BoardWorkspace";
 import { DecisionCard } from "@/components/DecisionCard";
+import { EvidenceMeter } from "@/components/EvidenceMeter";
 import { HappinessMeterCard } from "@/components/HappinessMeterCard";
-import { Header } from "@/components/Header";
-import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
-import { ScrollToCard } from "@/components/ScrollToCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { Matrix, QuadrantBadge, Section } from "@/components/ui";
+import { ConflictBadge, MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
@@ -18,6 +17,7 @@ import { QUADRANT, type Quadrant } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const VIEWS = [
+  { k: "board", label: "Board" },
   { k: "inbox", label: "Requirements" },
   { k: "matrix", label: "Decision matrix" },
   { k: "signals", label: "Signals" },
@@ -32,14 +32,14 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const vehicle = await getVehicle(code);
   if (!vehicle) notFound();
   const viewer = await getViewer();
-  const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
+  // Board is the default; existing list links (?req= selection, ?q= quadrant filter) keep opening the two-pane list.
+  const view = VIEWS.find((v) => v.k === sp.view)?.k ?? (typeof sp.req === "string" || typeof sp.q === "string" ? "inbox" : "board");
   // List filter: a quadrant, "quick" for quick wins (equipment BMW already sells) or "conflict" for market conflict cards.
   const qFilter = sp.q === "quick" || sp.q === "conflict" ? sp.q
     : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
-    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(),
-    storedOrder(code),
+    listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(), storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
   const conflicts = all.filter((r) => r.kind === "market_conflict");
@@ -50,54 +50,37 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
   return (
-    <main className="flex-1 bg-white">
-      <Header viewer={viewer} />
-
-      <section className="relative isolate overflow-hidden bg-night text-white">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/cars/${code}-wide.jpg`} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-60" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/85 via-black/55 to-black/10" />
-        <div className="container-x flex flex-col gap-5 py-12">
-          <p className="text-[13px] font-medium uppercase tracking-[0.14em] text-white/75">Requirements for the successor generation · {code}</p>
-          <h1 className="headline text-[40px] sm:text-[52px]">{vehicle.name}</h1>
-          <dl className="flex flex-wrap gap-x-10 gap-y-3 text-[14px]">
-            <div><dt className="text-white/60">Viewing as</dt><dd className="font-medium">{viewer.actor}</dd></div>
-            <div><dt className="text-white/60">Requirements in your region</dt><dd className="font-medium tabular-nums">{all.length}</dd></div>
-            <div><dt className="text-white/60">Awaiting decision</dt><dd className="font-medium tabular-nums">{awaiting}</dd></div>
-            <div><dt className="text-white/60">Comments analysed (all markets)</dt><dd className="font-medium tabular-nums">{totals.comments.toLocaleString("en-US")}</dd></div>
-          </dl>
-          {voices && (
-            <p className="max-w-[820px] border-l-2 border-validate bg-black/40 px-4 py-3 text-[14px] text-white/90">
-              <b className="uppercase tracking-[0.06em]">Missing voices.</b> {voices} Confidence is lowered accordingly.
-            </p>
-          )}
+    <div className="vehicle-workspace">
+      <section className="vehicle-summary">
+        <div className="vehicle-titlebar">
+        <div className="vehicle-heading">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/cars/${code}-wide.jpg`} alt="" />
+          <div><h1 className="page-heading">{vehicle.name}</h1><p className="page-caption">{code} · Requirements for the successor generation</p></div>
         </div>
-      </section>
-
-      <nav className="sticky top-[72px] z-20 border-b border-line bg-white" aria-label="Views">
-        <div className="container-x flex gap-8 overflow-x-auto">
-          {VIEWS.map((v) => (
-            <Link
-              key={v.k}
-              href={`/vehicles/${code}?view=${v.k}`}
-              className={`whitespace-nowrap border-b-2 py-4 text-[13px] font-bold uppercase tracking-[0.05em] ${view === v.k ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
-            >
-              {v.label}
-            </Link>
-          ))}
-          <div className="ml-auto flex shrink-0 items-center gap-2 py-2" aria-label="Export requirement list">
-            <span className="hidden text-[13px] text-ink-3 lg:inline">Requirement list in BMW format</span>
-            {/* Plain links: the route answers with a file download. */}
-            <a href={`/api/export?vehicle=${code}&format=csv`} className="btn-outline btn-sm" download>Export CSV</a>
-            <a href={`/api/export?vehicle=${code}&format=json`} className="btn-outline btn-sm" download>JSON</a>
+        <details className="export-menu">
+          <summary className="btn-outline btn-sm">Export</summary>
+          <div className="export-options" aria-label="Export requirement list">
+            <a href={`/api/export?vehicle=${code}&format=csv`} download>Export CSV</a>
+            <a href={`/api/export?vehicle=${code}&format=json`} download>Export JSON</a>
           </div>
+        </details>
         </div>
+        <dl className="vehicle-metrics">
+          <div><dd>{all.length}</dd><dt>requirements in your region</dt></div>
+          <div><dd className="text-blue">{awaiting}</dd><dt>awaiting decision</dt></div>
+          <div><dd>{totals.comments.toLocaleString("en-US")}</dd><dt>comments analysed (all markets)</dt></div>
+          <div className="viewer-metric"><dt>Viewing as</dt><dd>{viewer.actor}</dd></div>
+        </dl>
+        {voices && <p id="missing-voices" className="evidence-notice"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
+      </section>
+      <nav className="workspace-views" aria-label="Views">
+        {VIEWS.map((v) => <Link key={v.k} href={`/vehicles/${code}?view=${v.k}`} aria-current={view === v.k ? "page" : undefined}>{v.label}</Link>)}
       </nav>
-
-      <div className="container-x py-8">
+      <div className={`vehicle-body ${view === "inbox" ? "is-inbox" : view === "board" ? "is-board" : ""}`}>
+        {view === "board" && <BoardWorkspace sp={sp} viewer={viewer} basePath={`/vehicles/${code}`} fixedVehicle={code} heading="h2" />}
         {view === "inbox" && (
-          <div className="mb-6">
-            {/* Factor values, IDs and titles only: no customer text reaches this client component. */}
+          <div className="workspace-weights">
             <WeightsPanel
               items={[...all].sort((a, b) => stored.indexOf(a.id) - stored.indexOf(b.id))
                 .map((r) => ({ id: r.id, title: r.title, values: factorValues(r.priority_factors) }))}
@@ -109,14 +92,14 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         )}
         {view === "inbox" && <Inbox />}
         {view === "matrix" && (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,640px)_1fr]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,640px)_1fr]">
             <Section title="Priority against confidence" aside="Click a dot to open the requirement">
               <Matrix items={all} thresholds={weights.thresholds} vehicle={code} size={640} />
             </Section>
             <div className="grid content-start gap-4 sm:grid-cols-2">
               {(Object.keys(QUADRANT) as Quadrant[]).map((q) => (
                 <div key={q} className="card p-5">
-                  <div className="flex items-center justify-between"><QuadrantBadge q={q} /><span className="text-[28px] font-light tabular-nums">{all.filter((r) => r.quadrant === q).length}</span></div>
+                  <div className="flex items-center justify-between"><QuadrantBadge q={q} /><span className="text-[28px] font-semibold tabular-nums">{all.filter((r) => r.quadrant === q).length}</span></div>
                   <p className="mt-2 text-[14px] text-ink-2">{QUADRANT[q].hint}.</p>
                 </div>
               ))}
@@ -130,31 +113,95 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         {view === "signals" && <Signals />}
         {view === "data" && <DataHealth />}
       </div>
-    </main>
+    </div>
   );
 
   async function Inbox() {
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
     const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
-      <div className="flex flex-col">
-        {active && (
-          <p className="mb-4 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
-            <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
-            <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
-          </p>
-        )}
-        <BoardToolbar all={all} vehicle={code} filter={qFilter} search={search} />
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        {/* Desktop: the board stays in view beside the Decision Card, like an inbox. Phone: board, then card. */}
-        <div className="min-w-0 lg:sticky lg:top-[145px] lg:flex lg:h-[calc(100vh-170px)] lg:flex-col lg:self-start">
-          <RequirementsBoard items={reqs} vehicle={code} filter={qFilter} search={search} selected={selectedId} region={viewer.label} />
-        </div>
-        <div id="decision-card" className="min-w-0 scroll-mt-[145px]">
-          {detail && <ScrollToCard targetId="decision-card" selected={detail.requirement.id} />}
-          {detail ? (
-            <>
-            <a href={`${requirementBoardHref(code, qFilter, search)}#requirements-board`} className="mb-4 inline-flex text-[13px] font-medium text-blue hover:underline lg:hidden">← Back to requirements board</a>
+      <div className={`requirements-layout ${typeof sp.req === "string" && selectedId ? "has-selection" : ""}`}>
+        <aside className="requirements-list" aria-label="Requirements">
+          <div className="list-toolbar">
+            <div className="filter-chips" role="group" aria-label="Filter requirements">
+              {[null, "act", "validate", "monitor", "park"].map((q) => (
+                <Link
+                  key={q ?? "all"}
+                  href={`/vehicles/${code}?${q ? `q=${q}` : "view=inbox"}`}
+                  className="filter-chip"
+                  aria-current={qFilter === q ? "true" : undefined}
+                  scroll={false}
+                >
+                  {q ? QUADRANT[q as Quadrant].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
+                </Link>
+              ))}
+              <Link href={`/vehicles/${code}?q=quick`} scroll={false} className="filter-chip" aria-current={qFilter === "quick" ? "true" : undefined} title="Customers ask for equipment BMW already sells">
+                Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
+              </Link>
+              <Link href={`/vehicles/${code}?q=conflict`} scroll={false} className="filter-chip" aria-current={qFilter === "conflict" ? "true" : undefined} title="China and Europe disagree in the customer study">
+                Conflicts <span className="tabular-nums opacity-70">{conflicts.length}</span>
+              </Link>
+            </div>
+            {active && (
+              <p className="mt-3 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[11px] text-ink-2" data-testid="ranking-note">
+                <b>Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
+                <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+              </p>
+            )}
+            <div className="mt-4 flex items-baseline justify-between gap-3">
+              <h2 className="text-[12px] font-semibold">Ranked by priority</h2>
+              <span className="text-[10px] text-ink-3">MoSCoW, highest first</span>
+            </div>
+          </div>
+          <div className="requirement-rows">
+            {reqs.length === 0 && <p className="empty-state">No {qFilter === "quick" ? "quick wins" : qFilter === "conflict" ? "market conflicts" : "requirements"} with evidence in {viewer.label}.</p>}
+            {MOSCOW.map((m, gi) => {
+              const next = MOSCOW[gi - 1]?.min ?? 101;
+              const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
+              if (!rows.length) return null;
+              return (
+                <section key={m.key} aria-label={m.label}>
+                  <div className="requirement-group">
+                    <h3 className={`font-semibold ${m.text}`}>{m.label}</h3>
+                    <span className="text-[10px] text-ink-3" title={m.hint}>{rows.length} requirements</span>
+                  </div>
+                  <ul>
+                    {rows.map((r) => {
+                      const on = r.id === selectedId;
+                      return (
+                        <li key={r.id}>
+                          <Link
+                            href={`/vehicles/${code}?${qFilter ? `q=${qFilter}&` : ""}req=${r.id}`}
+                            aria-label={`${m.label}, priority ${r.priority}: ${r.title}`}
+                            className="requirement-row"
+                            aria-current={on ? "true" : undefined}
+                            scroll={false}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="requirement-row-title">{r.title}</span>
+                              <span className="requirement-score" title={`Priority ${r.priority}`} aria-label={`Priority ${r.priority}`}>{r.priority}</span>
+                            </div>
+                            <span className="requirement-row-meta">
+                              <span className="font-mono">{r.id}</span>
+                              <QuadrantBadge q={r.quadrant} />
+                              {r.kind === "quick_win" && <QuickWinBadge />}
+                              {r.kind === "market_conflict" && <ConflictBadge />}
+                              <StatusBadge s={r.status} />
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        </aside>
+        <div className="requirement-detail" key={selectedId}>
+          <Link href={`/vehicles/${code}?${qFilter ? `q=${qFilter}` : "view=inbox"}`} className="back-to-list" scroll={false}>← Back to requirements</Link>
+          {detail ? (<>
+            <EvidenceMeter mix={detail.requirement.evidence_mix} region={viewer.label} />
             <DecisionCard
               r={detail.requirement}
               quotes={detail.quotes}
@@ -167,9 +214,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             />
             </>
           ) : (
-            <p className="text-ink-3">Select a requirement.</p>
+            <div className="empty-state"><p className="font-medium text-ink-2">No requirement selected</p><p className="mt-2">Choose a requirement from the list to review its evidence and make a decision.</p></div>
           )}
-        </div>
         </div>
       </div>
     );

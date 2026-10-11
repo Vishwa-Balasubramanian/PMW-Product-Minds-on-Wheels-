@@ -82,4 +82,3 @@ class MixedCommentScopeTests(unittest.TestCase):
         parts = scope.sentences('no response about the oil leak, plus there is pressure toward a discount deal.')
         self.assertEqual(len(parts), 2)
         self.assertEqual([scope.text_scope(p)[0] for p in parts], [True, False])
-

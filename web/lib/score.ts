@@ -100,6 +100,12 @@ export const PRESETS: { key: string; label: string; idea: string; weights: Prior
     idea: "Market reach and pressure from European premium rivals.",
     weights: { impact: 0.3, frequency: 0.15, market: 0.3, competitive: 0.15, future: 0.1 },
   },
+  {
+    key: "us_focus",
+    label: "US focus",
+    idea: "Prioritise customer impact and market reach, with recurring problems ahead of future bets.",
+    weights: { impact: 0.4, frequency: 0.2, market: 0.25, competitive: 0.1, future: 0.05 },
+  },
 ];
 
 export function presetLabel(key: string | null | undefined): string {

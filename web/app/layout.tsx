@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Header } from "@/components/Header";
+import { getViewer } from "@/lib/gate";
+import { VoiceAgent } from "@/components/VoiceAgent";
 
-// Font: Albert Sans (stand-in for BMW Type Next), self-hosted in public/fonts, see globals.css.
-// No analytics, no third-party requests. Search engines are told not to index (also robots.ts and next.config headers).
+// Font: locally available BMW Type Next with self-hosted Inter fallback, see globals.css.
+// No analytics. Voice connects to OpenAI only after the PM starts a session.
 export const metadata: Metadata = {
   title: "PMW · Product Minds on Wheels",
   description: "Evidence-backed requirements for the next vehicle generation, with the product manager in control.",
@@ -14,10 +17,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const viewer = await getViewer();
   return (
-    <html lang="en" className="h-full">
-      <body className="min-h-full flex flex-col">{children}</body>
+    // Browser extensions add attributes to <html> (e.g. jd-enabled) before React hydrates.
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <body>
+        <Header viewer={viewer} />
+        <main id="workspace-main" tabIndex={-1} className="workspace-main">{children}</main>
+        <VoiceAgent key={viewer.region} region={viewer.region} />
+      </body>
     </html>
   );
 }

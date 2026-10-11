@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { REGIONS, type RegionCode } from "@/lib/regions";
 
-/** Amazon-style "deliver to" picker. In production the region comes from single sign-on. */
+/** Region context for the workspace. In production it comes from single sign-on. */
 export function RegionPicker({ region, light = false }: { region: RegionCode; light?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -48,27 +48,28 @@ export function RegionPicker({ region, light = false }: { region: RegionCode; li
         type="button"
         onClick={() => { setChoice(region); setError(null); setOpen(true); }}
         disabled={pending}
-        className={`flex items-center gap-2 text-left ${light ? "text-white" : "text-ink"}`}
+        className={`flex min-h-9 items-center gap-2 rounded-md px-2 text-left hover:bg-mist ${light ? "text-white" : "text-ink"}`}
         aria-haspopup="dialog"
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" />
           <circle cx="12" cy="9.5" r="2.5" />
         </svg>
         <span className="leading-tight">
-          <span className={`block text-[12px] ${light ? "text-white/80" : "text-ink-3"}`}>Your region</span>
-          <span className="block text-[15px] font-semibold">{pending ? "Switching…" : current.label}</span>
+          <span className={`block text-[10px] ${light ? "text-white/80" : "text-ink-3"}`}>Your region</span>
+          <span className="block text-[12px] font-medium">{pending ? "Switching…" : current.label}</span>
         </span>
       </button>
 
       <dialog
         ref={dialog}
+        aria-labelledby="region-heading"
         onClose={() => setOpen(false)}
         onClick={(e) => { if (e.target === dialog.current) setOpen(false); }}
         className="m-auto w-[min(440px,calc(100vw-32px))] p-0 text-ink backdrop:bg-black/50"
       >
         <div className="p-7">
-          <h2 className="headline text-[22px]">Choose your region</h2>
+          <h2 id="region-heading" className="headline text-[22px]">Choose your region</h2>
           <p className="mt-2 text-[14px] text-ink-2">
             You see customer comments from your own market only. Summary scores stay visible for every market.
           </p>

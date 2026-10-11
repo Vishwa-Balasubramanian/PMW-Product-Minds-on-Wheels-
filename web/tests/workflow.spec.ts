@@ -17,6 +17,9 @@ test('survey conflict cards show verified values and respect regional visibility
       const ladder = page.locator('section').filter({ has: page.getByRole('heading', { name: 'From customer voice to requirement', exact: true }) });
       await expect(ladder.getByText(/China 7.69 vs Europe 9.69 \/ 10/)).toBeVisible();
       await expect(ladder.getByText(/2025 vehicle sales shares: CN 23.8%, EU 31.0%/)).toBeVisible();
+      await expect(page.getByTestId('evidence-meter').locator('[data-part=observed]')).toHaveAttribute('data-value', '0');
+      await expect(page.getByTestId('evidence-meter').locator('[data-part=survey]')).not.toHaveAttribute('data-value', '0');
+      await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
       const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
       await expect(evidence.locator('li')).toHaveCount(0);
     }
@@ -53,6 +56,8 @@ test('equipment quick win displays only its matching wishing comments', async ({
     await expect(page.getByRole('heading', { name: r.title, exact: true })).toBeVisible();
     await expect(page.getByText(/Make ventilated front seats available on the successor/)).toBeVisible();
     expect(r.title).toContain('7VB');
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Customer evidence', exact: true })).toBeVisible();
     await expect(page.locator('article img').first()).toHaveAttribute('alt', 'Seats');
     const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
     const shownIds = await evidence.locator('li .font-mono').allTextContents();
@@ -80,7 +85,7 @@ test('quick wins filter and "You already sell this" banner keep comment IDs insi
 
     await page.goto(`/vehicles/G60?q=quick&req=${r.id}`);
     await expect(page.getByRole('link', { name: `Quick wins ${quickWins.length}` })).toBeVisible();
-    const rows = await page.getByTestId('requirement-card').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+    const rows = await page.locator('.requirement-row').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
     expect(rows.sort()).toEqual([...quickWins].sort());
 
     const banner = page.locator('section[aria-labelledby="already-sell-title"]');
@@ -94,6 +99,12 @@ test('quick wins filter and "You already sell this" banner keep comment IDs insi
     // Restricted IDs must not reach serialized client props either.
     const html = await (await page.request.get(`/vehicles/G60?q=quick&req=${r.id}`)).text();
     for (const blob of html.match(/feedback_ids\\?":\[[^\]]*\]/g) ?? []) for (const id of otherIds) expect(blob).not.toContain(id);
+    const quoteLink = banner.getByRole('link').first();
+    const target = await quoteLink.getAttribute('href');
+    await quoteLink.click();
+    await expect(page.getByRole('tab', { name: 'Evidence', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(target!)).toBeInViewport();
+    await expect(page.locator(target!)).toBeFocused();
   } finally { con.close(); }
 });
 
@@ -101,7 +112,7 @@ test('G70 displays a complete offline requirement ladder', async ({ page, contex
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await expect(page.getByRole('heading', { name: 'BMW 7 Series', exact: true })).toBeVisible();
   await expect(page.getByText('Evidence-based draft · needs validation', { exact: false })).toBeVisible();
   await expect(page.getByText(/Working hypothesis:/)).toBeVisible();
@@ -119,10 +130,12 @@ test('challenge reduces confidence, moves quadrant and records an audit trail', 
       { id: string; confidence: number; challenge: string };
     expect(r).toBeTruthy();
     await page.goto(`/vehicles/G70?req=${r.id}`);
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
     await page.getByRole('button', { name: 'Challenge', exact: true }).click();
     await page.getByLabel('What do you doubt? (optional)').fill('Check missing market voices before approval.');
     await page.getByRole('button', { name: 'Run the challenge', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Challenge result', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Evidence', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText(/This recommendation could be wrong/)).toBeVisible();
     await expect(page.getByText(/Priority ranges from/)).toBeVisible();
     const updated = con.prepare('SELECT confidence,quadrant,challenged FROM requirements WHERE id=?').get(r.id) as
@@ -187,11 +200,11 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const con = db();
   try {
-    const rows = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G60' AND kind='signal' ORDER BY priority DESC LIMIT 2").all() as { id: string; title: string }[];
+    const rows = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G60' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 2").all() as { id: string; title: string }[];
     await page.goto(`/vehicles/G60?req=${rows[0].id}`);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByLabel('Title', { exact: true }).fill('Unsaved text from a different requirement');
-    await page.getByTestId('requirement-card').filter({ hasText: rows[1].title }).click();
+    await page.locator(`.requirement-row[href*="req=${rows[1].id}"]`).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue(rows[1].title);
@@ -200,7 +213,8 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
 
 test('decision controls recover from a failed request and prevent duplicate submissions', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
-  await page.goto('/vehicles/G60');
+  const open = db().prepare("SELECT id FROM requirements WHERE vehicle='G60' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 1").get() as { id: string };
+  await page.goto(`/vehicles/G60?req=${open.id}`);
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
@@ -283,7 +297,8 @@ test('region restrictions and required reasons protect decision writes', async (
 test('region picker reports failure and can retry successfully on mobile', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
+  await page.locator('.requirement-row').first().click();
   await page.getByRole('button', { name: /Your region/ }).click();
   await page.getByRole('radio', { name: /^China/ }).check();
   await page.route('**/api/region', route => route.fulfill({ status: 503, body: 'Unavailable' }));
@@ -324,8 +339,9 @@ test('home, assets, unknown routes and mismatched selections behave consistently
   const con = db();
   try {
     await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Product Requirements Board', exact: true })).toBeVisible();
     for (const name of ['BMW 1 Series', 'BMW 5 Series', 'BMW 7 Series']) {
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      await expect(page.getByLabel('Vehicle').locator('option', { hasText: name })).toHaveCount(1);
     }
     const photos = con.prepare('SELECT DISTINCT photo FROM requirements WHERE photo IS NOT NULL').all();
     for (const { photo } of photos) {

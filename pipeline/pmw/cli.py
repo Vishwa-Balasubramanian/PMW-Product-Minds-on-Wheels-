@@ -9,7 +9,7 @@ import json
 from collections import Counter
 import hashlib
 
-from . import aspects, challenge, db, derive, evidence, ingest, market_requirements, score, signals, verify
+from . import aspects, challenge, db, derive, evidence, evidence_mix, ingest, market_requirements, score, signals, verify
 from .config import DB_PATH, MARKETS, VEHICLES
 from .themes import photo_topic
 
@@ -215,6 +215,7 @@ def build(args) -> None:
         evidence.build_equipment_matches(con, code)
         n = build_requirements(con, code, args.top, args.llm, weights)
         stats[code]["requirements"] = n + market_requirements.build(con, code, weights)
+    evidence_mix.refresh(con)
     con.commit()
     print(f"Database: {DB_PATH}")
     for code, s in stats.items():
@@ -233,6 +234,7 @@ def main() -> None:
     v = sub.add_parser('verify', help='Check citations, scores and data contracts without rebuilding')
     v.add_argument('--report', help='Write aggregate JSON report to this path')
     v.add_argument('--top', type=int, default=15, help='Expected requirements per vehicle')
+    sub.add_parser('evidence-mix', help='Add/backfill evidence mixes without rebuilding or changing PM decisions')
     args = ap.parse_args()
     if args.cmd == "build":
         if args.top < 1:
@@ -242,6 +244,14 @@ def main() -> None:
             os.environ['PMW_OFFLINE'] = '1'
             args.llm = True
         build(args)
+    elif args.cmd == 'evidence-mix':
+        con = db.connect()
+        with con:
+            # Explicit BEGIN includes additive DDL in the same transaction as the backfill.
+            con.execute('BEGIN IMMEDIATE')
+            changed = evidence_mix.refresh(con)
+        con.close()
+        print(f'Evidence mixes updated: {changed}; decisions and scores preserved.')
     elif args.cmd == 'verify':
         from pathlib import Path
         con = db.connect()

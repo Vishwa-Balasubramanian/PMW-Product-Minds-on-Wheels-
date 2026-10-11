@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
 import { AuditTimeline } from "@/components/ui";
 import { auditLog, getViewer } from "@/lib/gate";
 
@@ -21,28 +20,25 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   if (who) events = events.filter((e) => e.actor_type === who);
 
   return (
-    <main className="flex-1">
-      <Header viewer={viewer} />
-      <div className="container-x py-12">
-        <h1 className="headline text-[36px]">Audit trail</h1>
-        <p className="mt-3 max-w-[680px] text-[16px] text-ink-2">
-          A complete, chronological record of every AI step, product manager decision and access to customer evidence.
-          Nothing here can be edited or deleted from the app.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
-            <Link key={f.k} href={`/audit?vehicle=${f.k}${who ? `&who=${who}` : ""}`} className={`h-9 border px-4 text-[14px] leading-9 ${vehicle === f.k ? "border-ink bg-ink text-white" : "border-line hover:border-ink"}`}>{f.label}</Link>
-          ))}
-          <span className="mx-2 w-px bg-line" />
-          {[{ k: "", l: "Everyone" }, { k: "pm", l: "Product managers" }, { k: "ai", l: "AI" }, { k: "system", l: "System and access" }].map((f) => (
-            <Link key={f.k} href={`/audit?vehicle=${vehicle}${f.k ? `&who=${f.k}` : ""}`} className={`h-9 border px-4 text-[14px] leading-9 ${who === f.k ? "border-ink bg-ink text-white" : "border-line hover:border-ink"}`}>{f.l}</Link>
-          ))}
-        </div>
-        <div className="mt-8 card p-6">
-          <p className="mb-4 text-[13px] text-ink-3">{events.length} events, newest first</p>
-          <AuditTimeline events={events} />
-        </div>
+    <div className="page-content">
+      <h1 className="page-heading">Audit trail</h1>
+      <p className="page-caption max-w-[720px]">
+        A complete, chronological record of every AI step, product manager decision and access to customer evidence.
+        Nothing here can be edited or deleted from the app.
+      </p>
+      <div className="mt-6 flex flex-wrap gap-2" aria-label="Audit filters">
+        {FILTERS.map((f) => (
+          <Link key={f.k} href={`/audit?vehicle=${f.k}${who ? `&who=${who}` : ""}`} className="filter-chip" aria-current={vehicle === f.k ? "true" : undefined}>{f.label}</Link>
+        ))}
+        <span className="mx-2 w-px bg-line" />
+        {[{ k: "", l: "Everyone" }, { k: "pm", l: "Product managers" }, { k: "ai", l: "AI" }, { k: "system", l: "System and access" }].map((f) => (
+          <Link key={f.k} href={`/audit?vehicle=${vehicle}${f.k ? `&who=${f.k}` : ""}`} className="filter-chip" aria-current={who === f.k ? "true" : undefined}>{f.l}</Link>
+        ))}
       </div>
-    </main>
+      <div className="mt-5 card p-4 sm:p-6">
+        <p className="mb-4 text-[13px] text-ink-3">{events.length} events, newest first</p>
+        <AuditTimeline events={events} />
+      </div>
+    </div>
   );
 }

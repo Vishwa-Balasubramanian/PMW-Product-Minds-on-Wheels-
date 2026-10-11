@@ -3,6 +3,7 @@
 // In production the region comes from BMW single sign-on; in this prototype it is a cookie set by the region picker.
 import type { InStatement } from "@libsql/client";
 import { cookies } from "next/headers";
+import { isRepresentationIssue, type BoardCard, type BoardVehicle } from "./board";
 import { all, nowIso, one, parse, writeBatch } from "./db";
 import { DEFAULT_REGION, MARKET_LABEL, MARKETS, REGIONS, REGION_COOKIE, isRegion, marketsFor, type Market, type RegionCode } from "./regions";
 import { PRIORITY_FACTORS, factorValues, quadrantOf, sensitivity, weightedScore, type PriorityWeights, type Thresholds } from "./score";
@@ -73,11 +74,55 @@ export async function listVehicles(viewer: Viewer): Promise<VehicleCard[]> {
   );
 }
 
+/**
+ * Vehicle programs in portfolio order (flagship first), with the same regional availability rules
+ * as listVehicles: available = sold in the viewer's markets in 2025; thin = sold but no comments there.
+ */
+export async function vehicleNames(viewer: Viewer): Promise<BoardVehicle[]> {
+  const mk = viewer.markets;
+  const rows = (await all<{ code: string; name: string; sold: number; comments: number }>(
+    `SELECT v.code, v.name,
+       (SELECT COALESCE(SUM(volume),0) FROM sales s WHERE s.vehicle = v.code AND s.year = 2025 AND s.market IN ${inList(mk)}) AS sold,
+       (SELECT COUNT(*) FROM feedback f WHERE f.vehicle = v.code AND f.market IN ${inList(mk)}) AS comments
+     FROM vehicles v`, [...mk, ...mk],
+  )).map(({ code, name, sold, comments }) => ({ code, name, available: Number(sold) > 0, thin: Number(sold) > 0 && Number(comments) === 0 }));
+  const order = ["G70", "G60", "F70"];
+  return rows.sort((a, b) => (order.indexOf(a.code) + 1 || 99) - (order.indexOf(b.code) + 1 || 99) || a.code.localeCompare(b.code));
+}
+
 export async function getVehicle(code: string) {
   return one<{ code: string; name: string; short: string; image: string }>(
     "SELECT code, name, short, image FROM vehicles WHERE code = ?",
     [code],
   );
+}
+
+export type PortfolioCell = { vehicle: string; comments: number; negative: number; share: number | null };
+export type PortfolioTheme = { theme: string; recurring: boolean; cells: PortfolioCell[] };
+
+/** Global, aggregate-only view. No feedback text, IDs, or dominant-issue snippets are read. */
+export async function portfolio(): Promise<{
+  vehicles: { code: string; short: string }[]; themes: PortfolioTheme[]; recurring: number;
+}> {
+  const [vehicles, signals] = await Promise.all([
+    all<{ code: string; short: string }>("SELECT code, short FROM vehicles ORDER BY code"),
+    all<{ vehicle: string; topic: string; comments: number; negative: number }>(
+      "SELECT vehicle, topic, SUM(n_comments) AS comments, SUM(n_negative) AS negative FROM signals WHERE in_scope=1 GROUP BY vehicle, topic"),
+  ]);
+  const byTheme = new Map<string, Map<string, PortfolioCell>>();
+  for (const s of signals) {
+    const cells = byTheme.get(s.topic) ?? new Map<string, PortfolioCell>();
+    cells.set(s.vehicle, { vehicle: s.vehicle, comments: s.comments, negative: s.negative,
+      share: s.comments > 0 ? s.negative / s.comments : null });
+    byTheme.set(s.topic, cells);
+  }
+  const themes = [...byTheme].map(([theme, cells]) => ({
+    theme, recurring: [...cells.values()].filter(c => c.negative > 0).length >= 2,
+    cells: vehicles.map(v => cells.get(v.code) ?? { vehicle: v.code, comments: 0, negative: 0, share: null }),
+  })).sort((a, b) => Number(b.recurring) - Number(a.recurring)
+    || b.cells.reduce((sum, c) => sum + c.negative, 0) - a.cells.reduce((sum, c) => sum + c.negative, 0)
+    || a.theme.localeCompare(b.theme));
+  return { vehicles, themes, recurring: themes.filter(t => t.recurring).length };
 }
 
 // ---------- requirements ----------
@@ -92,6 +137,8 @@ function toRequirement(r: Row): Requirement {
     survey: parse(r.survey, []),
     conflicts: parse(r.conflicts, []),
     already_exists: parse(r.already_exists, []),
+    evidence_mix: parse(r.evidence_mix, null),
+    evidence_mix_by_market: parse(r.evidence_mix_by_market, {}),
     priority_factors: parse(r.priority_factors, {}),
     confidence_factors: parse(r.confidence_factors, {}),
     challenge: parse(r.challenge, { issues: [], revised_confidence: 0 }),
@@ -105,6 +152,8 @@ function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
   // Lists are also serialized into client component props. Raw quotes must not
   // survive there just because the visible quote list is region-filtered.
   return { ...r, customer_voice: null,
+    evidence_mix: r.evidence_mix_by_market[viewer.region] ?? null,
+    evidence_mix_by_market: {},
     contradictions: r.contradictions.map((text) => text.split(" For example ")[0]) };
 }
 
@@ -142,6 +191,38 @@ export async function listRequirements(viewer: Viewer, vehicle: string): Promise
   if (!ranking) return list;
   // Stable sort: ties keep the stored (default-weight) order. The weights preview reproduces this rule client-side.
   return list.map((r) => rescore(r, ranking)).sort((a, b) => b.priority - a.priority);
+}
+
+/**
+ * Compact Kanban cards for every requirement the viewer may see, across the given vehicles.
+ * Reuses listRequirements (region filter, rescoring). Comment counts are restricted to the
+ * viewer's markets: signal comments from signals.by_market, quick-win comments from visible match IDs.
+ */
+export async function boardCards(viewer: Viewer, vehicles: { code: string; name: string }[]): Promise<BoardCard[]> {
+  const codes = vehicles.map((v) => v.code);
+  if (!codes.length) return [];
+  const [lists, signals] = await Promise.all([
+    Promise.all(codes.map((code) => listRequirements(viewer, code))),
+    all<{ id: string; by_market: string }>(`SELECT id, by_market FROM signals WHERE vehicle IN ${inList(codes)}`, codes),
+  ]);
+  const byMarket = new Map(signals.map((s) => [s.id, parse<Record<string, number>>(s.by_market, {})]));
+  const name = new Map(vehicles.map((v) => [v.code, v.name]));
+  return lists.flat().map((r) => {
+    let comments: number | null = null;
+    if (r.kind === "signal") {
+      const counts = byMarket.get(r.signal_id) ?? {};
+      comments = viewer.markets.reduce((n, m) => n + (counts[m] ?? 0), 0);
+    } else if (r.kind === "quick_win") {
+      comments = new Set(r.already_exists.flatMap((m) => m.feedback_ids ?? [])).size;
+    }
+    return {
+      id: r.id, title: r.title, vehicle: r.vehicle, vehicleName: name.get(r.vehicle) ?? r.vehicle,
+      status: r.status, quadrant: r.quadrant, priority: r.priority, confidence: r.confidence,
+      kind: r.kind, challenged: r.challenged, comments,
+      representation: r.challenge.issues.map((i) => i.text).filter(isRepresentationIssue),
+      updatedAt: r.updated_at,
+    };
+  });
 }
 
 /** Requirement IDs in the stored (default-weight) order, the tie-break for any re-ranking. IDs only. */
@@ -294,6 +375,9 @@ const COMMENT_ID = /\b[A-Z][0-9]{2}-\d{4}\b/g;
  */
 async function redactAuditIds(viewer: Viewer, events: AuditEvent[]): Promise<AuditEvent[]> {
   if (viewer.region === "ALL") return events;
+  // Spoken requests can repeat customer text, not just comment IDs. Keep voice
+  // requests/results inside the originating region (the global PM may see all).
+  events = events.filter((e) => e.actor !== "PM (voice)" || e.region === viewer.region);
   const fields = ["action", "before", "after", "rationale"] as const;
   const ids = new Set<string>();
   for (const e of events) for (const f of fields) for (const m of (e[f] ?? "").matchAll(COMMENT_ID)) ids.add(m[0]);
@@ -453,6 +537,28 @@ export async function missingVoices(vehicle: string): Promise<string | null> {
   let s = `${Math.round(top.feedback_share * 100)}% of customer comments come from ${MARKET_LABEL[top.market]}, which buys ${Math.round(top.sales_share * 100)}% of these cars.`;
   if (silent.length) s += ` ${silent.map((r) => `${MARKET_LABEL[r.market]} (${Math.round(r.sales_share * 100)}% of sales)`).join(" and ")} ${silent.length > 1 ? "have" : "has"} no comments at all.`;
   return s;
+}
+
+/** Briefing reads use the same regional gate as the requirement workspace. */
+export async function voiceBriefing(viewer: Viewer, since: string | null) {
+  const vehicles = await listVehicles(viewer);
+  const groups = await Promise.all(vehicles.filter((v) => v.available).map(async (v) => {
+    const [requirements, gap] = await Promise.all([listRequirements(viewer, v.code), missingVoices(v.code)]);
+    return { vehicle: v.code, requirements, gap };
+  }));
+  const requirements = groups.flatMap((g) => g.requirements);
+  const compact = (r: Requirement) => ({ id: r.id, vehicle: r.vehicle, title: r.title, confidence: r.confidence, status: r.status, created_at: r.created_at });
+  const conflicts = requirements.filter((r) => r.kind === "market_conflict" || r.conflicts.length > 0);
+  const pending = requirements.filter((r) => ["proposed", "edited", "validate"].includes(r.status));
+  return {
+    as_of: nowIso(), since, first_briefing: since === null,
+    existing_conflicts: conflicts.length,
+    new_conflicts: since ? conflicts.filter((r) => Date.parse(r.created_at) > Date.parse(since)).map(compact) : [],
+    pending_count: pending.length,
+    pending_decisions: pending.sort((a, b) => b.priority - a.priority).slice(0, 10).map(compact),
+    gaps: groups.filter((g) => g.gap).map((g) => ({ model: g.vehicle, warning: g.gap })),
+    note: "Snapshot of the loaded PMW data; new conflicts means requirements created since this region's previous voice briefing. No live customer feed is connected.",
+  };
 }
 
 export async function marketConflicts(vehicle: string) {

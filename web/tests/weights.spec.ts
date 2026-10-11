@@ -8,14 +8,15 @@ const base = 'http://127.0.0.1:3107';
 
 /** The ranked list as "priority: title" in display order. */
 async function ranked(page: Page): Promise<string[]> {
-  return page.getByTestId('requirement-card').evaluateAll(
-    (as) => as.map((a) => `${a.getAttribute('data-priority')}: ${a.querySelector('[data-card-title]')?.textContent ?? ''}`));
+  const labels = await page.locator('aside section[aria-label] a[aria-label]').evaluateAll(
+    (as) => as.map((a) => a.getAttribute('aria-label') ?? ''));
+  return labels.map((l) => l.replace(/^.*?, priority /, ''));
 }
 
 test('priority weights re-rank the 7 Series, are audited, persist and reset exactly', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: base }]);
   try {
-    await page.goto('/vehicles/G70');
+    await page.goto('/vehicles/G70?view=inbox');
     const before = await ranked(page);
     expect(before.length).toBeGreaterThan(10);
     await expect(page.getByTestId('ranking-note')).toHaveCount(0);
@@ -70,7 +71,7 @@ test('priority weights re-rank the 7 Series, are audited, persist and reset exac
     await expect(page.getByText('set priority weights: Customer first').first()).toBeVisible();
     await expect(page.getByText('Rank by customer pain for the 7 Series review').first()).toBeVisible();
 
-    await page.goto('/vehicles/G70');
+    await page.goto('/vehicles/G70?view=inbox');
     await page.getByRole('button', { name: /Priority weights/ }).click();
     await page.getByLabel('Reason').fill('Back to the reviewed defaults');
     await page.getByRole('button', { name: 'Reset to defaults' }).click();

@@ -46,6 +46,12 @@ returns authorized markets only and `share: null` when evidence is missing; the 
 Implementation notes: [Happiness data](docs/HAPPINESS_DATA.md), [survey and scope](docs/SURVEY_AND_SCOPE.md),
 [photos](docs/REQUIREMENT_PHOTOS.md), and [pitch data traps](docs/pitch/data-traps.md).
 
+Vishwa Phase 2 adds a region-aware evidence/assumption meter and `/portfolio`, a theme-by-vehicle heatmap with
+aggregate counts only. The additive `requirements.evidence_mix` and `evidence_mix_by_market` columns can be
+backfilled without replacing decisions: back up the existing database, then run `uv run pmw evidence-mix` from
+`pipeline`. A full rebuild is still needed to regenerate upstream source changes. See the [Phase 2 delivery and
+migration notes](docs/PHASE2_VISHWA.md) and [scoring pitch](docs/pitch/scoring.md).
+
 Regression checks: `cd pipeline && uv run --extra llm python -m unittest discover -s tests -v`, then
 `cd ../web && node --test scripts/test-equipment-evidence.mjs scripts/test-happiness.mjs scripts/test-score.mjs && npx tsc --noEmit && npm run build`.
 Run `npm run test:e2e` after building; it uses a separate copy of the local database.
@@ -118,6 +124,8 @@ Without a matching cache, the pipeline uses explicit evidence-based templates an
 Live-model caches are not included in the offline-first deliverable.
 
 Implementation, checks and limitations: [Vishwa pipeline handoff](docs/VISHWA_IMPLEMENTATION.md).
+
+Optional voice agent (OpenAI Realtime): [setup, tools and safety](docs/VOICE_COPILOT.md). Set the server-side `OPENAI_API_KEY` in `web/.env.local`, then click the small microphone at the bottom of any page to talk to PMW in English or German.
 
 ## Repo map
 
