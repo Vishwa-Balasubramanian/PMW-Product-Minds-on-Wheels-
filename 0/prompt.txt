@@ -1,0 +1,1 @@
+Analyse Arjun's Kanban and check whether it aligns with our design language and and review whether it follows our aesthetics of the site. Aso check its code
