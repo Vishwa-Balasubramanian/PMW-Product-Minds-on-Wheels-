@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
+import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { Header } from "@/components/Header";
 import { ScrollToCard } from "@/components/ScrollToCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
@@ -281,8 +282,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const [rep, conflicts, issues] = await Promise.all([representation(code), marketConflicts(code), dataIssues(code)]);
     const sev: Record<string, string> = { critical: "bg-danger text-white", warning: "bg-validate-soft text-validate", info: "bg-mist text-ink-2" };
     return (
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-1">
+            <HappinessMeterCard viewer={viewer} vehicle={code} />
+          </div>
+          <div className="grid gap-6 xl:col-span-2 xl:grid-cols-2">
+            <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
           <ul className="flex flex-col gap-4">
             {rep.map((r) => (
               <li key={r.market} className="text-[13px]">
@@ -293,23 +299,25 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             ))}
           </ul>
         </Section>
-        <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
-          {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
-            <table className="w-full text-[13px]">
-              <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
-              <tbody>
-                {conflicts.map((c) => (
-                  <tr key={c.attribute} className="border-t border-line">
-                    <td className="py-2">{c.attribute}</td>
-                    <td className="py-2 text-right tabular-nums">{c.cn}</td>
-                    <td className="py-2 text-right tabular-nums">{c.eu}</td>
-                    <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
+            <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
+              {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
+                <table className="w-full text-[13px]">
+                  <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
+                  <tbody>
+                    {conflicts.map((c) => (
+                      <tr key={c.attribute} className="border-t border-line">
+                        <td className="py-2">{c.attribute}</td>
+                        <td className="py-2 text-right tabular-nums">{c.cn}</td>
+                        <td className="py-2 text-right tabular-nums">{c.eu}</td>
+                        <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          </div>
+        </div>
         <div className="xl:col-span-2">
           <Section title="Data issues found and how they were handled">
             <ul className="flex flex-col divide-y divide-line">
