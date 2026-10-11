@@ -15,7 +15,7 @@ const PROMPT: Record<Exclude<Mode, null>, { label: string; placeholder: string; 
 };
 
 /** Approve, validate first, edit, reject, challenge. Posts to /api/requirements/[id] and refreshes the page. */
-export function DecisionActions({ r }: { r: Requirement }) {
+export function DecisionActions({ r, hideApprove }: { r: Requirement; hideApprove?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(null);
   const [why, setWhy] = useState("");
@@ -62,7 +62,7 @@ export function DecisionActions({ r }: { r: Requirement }) {
           <button className="btn-outline btn-sm" onClick={() => send("reopen")} disabled={pending}>Reopen</button>
         ) : (
           <>
-            <button className="btn-primary btn-sm" onClick={() => setMode("approve")} disabled={pending}>Approve</button>
+            {!hideApprove && <button className="btn-primary btn-sm" onClick={() => setMode("approve")} disabled={pending}>Approve</button>}
             <button className="btn-outline btn-sm" onClick={() => setMode("validate")} disabled={pending}>Validate first</button>
             <button className="btn-outline btn-sm" onClick={() => setMode("edit")} disabled={pending}>Edit</button>
             <button className="btn-outline btn-sm" onClick={() => setMode("reject")} disabled={pending}>Reject</button>

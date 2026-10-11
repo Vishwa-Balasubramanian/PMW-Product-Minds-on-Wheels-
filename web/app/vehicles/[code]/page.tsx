@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { BoardWorkspace } from "@/components/BoardWorkspace";
 import { DecisionCard } from "@/components/DecisionCard";
 import { EvidenceMeter } from "@/components/EvidenceMeter";
+import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
+import { ConflictBadge, MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
 import {
   auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
@@ -33,13 +34,18 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const viewer = await getViewer();
   // Board is the default; existing list links (?req= selection, ?q= quadrant filter) keep opening the two-pane list.
   const view = VIEWS.find((v) => v.k === sp.view)?.k ?? (typeof sp.req === "string" || typeof sp.q === "string" ? "inbox" : "board");
-  const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
+  // List filter: a quadrant, "quick" for quick wins (equipment BMW already sells) or "conflict" for market conflict cards.
+  const qFilter = sp.q === "quick" || sp.q === "conflict" ? sp.q
+    : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
     listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(), storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
-  const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const conflicts = all.filter((r) => r.kind === "market_conflict");
+  const search = view === "inbox" && typeof sp.search === "string" ? sp.search.trim().slice(0, 256) : "";
+  const filtered = qFilter === "quick" ? quickWins : qFilter === "conflict" ? conflicts : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const reqs = search ? filtered.filter((r) => r.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) : filtered;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
 
@@ -132,6 +138,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               <Link href={`/vehicles/${code}?q=quick`} scroll={false} className="filter-chip" aria-current={qFilter === "quick" ? "true" : undefined} title="Customers ask for equipment BMW already sells">
                 Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
               </Link>
+              <Link href={`/vehicles/${code}?q=conflict`} scroll={false} className="filter-chip" aria-current={qFilter === "conflict" ? "true" : undefined} title="China and Europe disagree in the customer study">
+                Conflicts <span className="tabular-nums opacity-70">{conflicts.length}</span>
+              </Link>
             </div>
             {active && (
               <p className="mt-3 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[11px] text-ink-2" data-testid="ranking-note">
@@ -145,7 +154,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             </div>
           </div>
           <div className="requirement-rows">
-            {reqs.length === 0 && <p className="empty-state">No {qFilter === "quick" ? "quick wins" : "requirements"} with evidence in {viewer.label}.</p>}
+            {reqs.length === 0 && <p className="empty-state">No {qFilter === "quick" ? "quick wins" : qFilter === "conflict" ? "market conflicts" : "requirements"} with evidence in {viewer.label}.</p>}
             {MOSCOW.map((m, gi) => {
               const next = MOSCOW[gi - 1]?.min ?? 101;
               const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
@@ -176,6 +185,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
                               <span className="font-mono">{r.id}</span>
                               <QuadrantBadge q={r.quadrant} />
                               {r.kind === "quick_win" && <QuickWinBadge />}
+                              {r.kind === "market_conflict" && <ConflictBadge />}
                               <StatusBadge s={r.status} />
                             </span>
                           </Link>
@@ -255,8 +265,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const [rep, conflicts, issues] = await Promise.all([representation(code), marketConflicts(code), dataIssues(code)]);
     const sev: Record<string, string> = { critical: "bg-danger text-white", warning: "bg-validate-soft text-validate", info: "bg-mist text-ink-2" };
     return (
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-1">
+            <HappinessMeterCard viewer={viewer} vehicle={code} />
+          </div>
+          <div className="grid gap-6 xl:col-span-2 xl:grid-cols-2">
+            <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
           <ul className="flex flex-col gap-4">
             {rep.map((r) => (
               <li key={r.market} className="text-[13px]">
@@ -267,23 +282,25 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             ))}
           </ul>
         </Section>
-        <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
-          {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
-            <table className="w-full text-[13px]">
-              <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
-              <tbody>
-                {conflicts.map((c) => (
-                  <tr key={c.attribute} className="border-t border-line">
-                    <td className="py-2">{c.attribute}</td>
-                    <td className="py-2 text-right tabular-nums">{c.cn}</td>
-                    <td className="py-2 text-right tabular-nums">{c.eu}</td>
-                    <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
+            <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
+              {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
+                <table className="w-full text-[13px]">
+                  <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
+                  <tbody>
+                    {conflicts.map((c) => (
+                      <tr key={c.attribute} className="border-t border-line">
+                        <td className="py-2">{c.attribute}</td>
+                        <td className="py-2 text-right tabular-nums">{c.cn}</td>
+                        <td className="py-2 text-right tabular-nums">{c.eu}</td>
+                        <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          </div>
+        </div>
         <div className="xl:col-span-2">
           <Section title="Data issues found and how they were handled">
             <ul className="flex flex-col divide-y divide-line">

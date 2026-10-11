@@ -4,6 +4,7 @@ import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
 import { ReviewTabs } from "./ReviewTabs";
 import { AlreadySellBanner } from "./AlreadySellBanner";
+import { ConflictBlock } from "./ConflictBlock";
 import { DecisionActions } from "./DecisionActions";
 import { AuditTimeline, FactorBars, Matrix, MoscowBadge, QuadrantBadge, ScorePair, Section, StatusBadge } from "./ui";
 
@@ -73,6 +74,8 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
   const hiddenTotal = Object.values(hidden).reduce((a, b) => a + b, 0);
   const originalConfidence = events.find((e) => e.field === "confidence")?.before;
   const representation = r.challenge.issues.map((i) => i.text).filter(isRepresentationIssue);
+  // Events arrive newest first: the latest approval carries the scope decision of a market conflict card.
+  const approval = r.status === "approved" ? events.find((e) => e.field === "status" && e.after === "approved") : undefined;
 
   return (
     <article className="decision-card" aria-label="Requirement review" data-requirement-id={r.id} data-status={r.status}>
@@ -95,7 +98,18 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
         <p className="mt-3 text-[11px] text-ink-3">{draftLabel(r.generated_by)}</p>
         <p className="mt-1 text-[11px] text-ink-3">Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</p>
       </header>
-      <div className="decision-actions"><DecisionActions key={`${r.id}:${r.updated_at}`} r={r} /></div>
+      {r.kind === "market_conflict" && (
+        <ConflictBlock
+          key={`conflict:${r.id}:${r.updated_at}`}
+          r={{ id: r.id, kind: r.kind, status: r.status, conflicts: r.conflicts }}
+          approval={approval && {
+            actor: approval.actor,
+            rationale: approval.rationale,
+            when: new Date(approval.ts).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+          }}
+        />
+      )}
+      <div className="decision-actions"><DecisionActions key={`${r.id}:${r.updated_at}`} r={r} hideApprove={r.kind === "market_conflict"} /></div>
 
       {r.challenged && (
         <section className="challenge-result">

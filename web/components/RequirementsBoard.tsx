@@ -249,9 +249,10 @@ function Card({ c, threshold, openHref, menuOpen, dragging, onDragStart, onDragE
       </dl>
       <p className="board-card-rec">AI recommendation: <b className={`rec-${c.quadrant}`}>{QUADRANT[c.quadrant].label}</b></p>
       <p className="board-card-evidence">{c.comments === null ? "Survey evidence only" : `${c.comments.toLocaleString("en-US")} customer comment${c.comments === 1 ? "" : "s"}`}</p>
-      {(weak || c.representation.length > 0 || c.challenged || c.kind === "quick_win") && (
+      {(weak || c.representation.length > 0 || c.challenged || c.kind !== "signal") && (
         <ul className="board-card-flags">
           {c.kind === "quick_win" && <li className="flag-quick">Quick win</li>}
+          {c.kind === "market_conflict" && <li className="flag-warn">Market conflict</li>}
           {weak && <li className="flag-warn" title={`Confidence below ${threshold}`}>Weak evidence</li>}
           {c.representation.length > 0 && <li className="flag-muted" title={c.representation.join(" ")}>Market underrepresented</li>}
           {c.challenged && <li className="flag-challenge">Challenged</li>}

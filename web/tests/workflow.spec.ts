@@ -85,7 +85,7 @@ test('quick wins filter and "You already sell this" banner keep comment IDs insi
 
     await page.goto(`/vehicles/G60?q=quick&req=${r.id}`);
     await expect(page.getByRole('link', { name: `Quick wins ${quickWins.length}` })).toBeVisible();
-    const rows = await page.locator('aside li a').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
+    const rows = await page.locator('.requirement-row').evaluateAll(as => as.map(a => new URL((a as HTMLAnchorElement).href).searchParams.get('req')));
     expect(rows.sort()).toEqual([...quickWins].sort());
 
     const banner = page.locator('section[aria-labelledby="already-sell-title"]');
@@ -200,11 +200,11 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const con = db();
   try {
-    const rows = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G60' AND kind='signal' ORDER BY priority DESC LIMIT 2").all() as { id: string; title: string }[];
+    const rows = con.prepare("SELECT id,title FROM requirements WHERE vehicle='G60' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 2").all() as { id: string; title: string }[];
     await page.goto(`/vehicles/G60?req=${rows[0].id}`);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.getByLabel('Title', { exact: true }).fill('Unsaved text from a different requirement');
-    await page.locator(`aside a[href$="req=${rows[1].id}"]`).click();
+    await page.locator(`.requirement-row[href*="req=${rows[1].id}"]`).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue(rows[1].title);
@@ -213,7 +213,8 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
 
 test('decision controls recover from a failed request and prevent duplicate submissions', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
-  await page.goto('/vehicles/G60?view=inbox');
+  const open = db().prepare("SELECT id FROM requirements WHERE vehicle='G60' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 1").get() as { id: string };
+  await page.goto(`/vehicles/G60?req=${open.id}`);
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });

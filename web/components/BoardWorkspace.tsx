@@ -1,9 +1,10 @@
 import { DecisionCard } from "@/components/DecisionCard";
+import { HappinessMeter } from "@/components/HappinessMeter";
 import { EvidenceMeter } from "@/components/EvidenceMeter";
 import { RequirementDrawer } from "@/components/RequirementDrawer";
 import { RequirementsBoard } from "@/components/RequirementsBoard";
 import { SORTS, applyFilters, type BoardFilters, type ConfidenceLevel, type SortKey } from "@/lib/board";
-import { auditFor, boardCards, getActiveWeights, getFactorLabels, getRequirement, getWeights, listRequirements, vehicleNames, type Viewer } from "@/lib/gate";
+import { auditFor, boardCards, getActiveWeights, getFactorLabels, getRequirement, getWeights, happiness, listRequirements, vehicleNames, type Viewer } from "@/lib/gate";
 import { MOSCOW } from "@/lib/moscow";
 import { presetLabel } from "@/lib/score";
 import { QUADRANT, type Quadrant } from "@/lib/types";
@@ -23,6 +24,8 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
 
   const vehicle = fixedVehicle ?? (vehicles.some((v) => v.code === sp.vehicle) ? one(sp.vehicle) : "all");
   const selected = vehicles.find((v) => v.code === vehicle);
+  // Happiness is measured per vehicle program, so the sidebar meter appears once one vehicle is selected.
+  const pain = selected ? await happiness(viewer, selected.code) : null;
   const filters: BoardFilters = {
     vehicle,
     moscow: MOSCOW.some((m) => m.key === sp.priority) ? one(sp.priority) : null,
@@ -71,14 +74,21 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
             {selected?.thin && <p className="board-availability"><b>Thin evidence.</b> No customer comments from {viewer.label} for the {selected.name}. Requirements rest on survey means only.</p>}
           </div>
         }
-        summary={
+        summary={<>
           <dl className="board-kpis" aria-label="Requirement counts">
             <div><dt>Awaiting Review</dt><dd className="text-blue">{fmt(count("proposed", "edited"))}</dd></div>
             <div><dt>Needs Validation</dt><dd>{fmt(count("validate"))}</dd></div>
             <div><dt>Approved</dt><dd>{fmt(count("approved"))}</dd></div>
             <div><dt>Total Requirements</dt><dd>{fmt(scoped.length)}</dd></div>
           </dl>
-        }
+          {pain && selected && (
+            <section className="board-happiness" aria-label={`Customer pain addressed, ${selected.name}`}>
+              <h3>Customer pain addressed</h3>
+              <p>Share of negative comments covered by approved requirements · {selected.name}</p>
+              <HappinessMeter data={pain} />
+            </section>
+          )}
+        </>}
       />
       {inScope && (
         <RequirementDrawer closeHref={closeHref} title={`${detail.requirement.id}: ${detail.requirement.title}`}>
