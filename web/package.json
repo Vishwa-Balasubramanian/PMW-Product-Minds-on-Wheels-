@@ -12,6 +12,7 @@
     "db:push": "node --env-file-if-exists=.env.local scripts/push-db.mjs"
   },
   "dependencies": {
+    "@elevenlabs/client": "^1.27.0",
     "@libsql/client": "^0.18.0",
     "next": "16.4.0",
     "react": "19.3.0",

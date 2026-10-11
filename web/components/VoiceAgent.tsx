@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { agentFocus } from "@/lib/agentFocus";
 import { noVoiceData, VOICE_TOOLS, type ConfirmableAction, type VoiceConfirmation, type VoiceResult, type VoiceTool } from "@/lib/voice/config";
+import { ElevenSession } from "@/lib/voice/eleven";
 import { LocalVoiceSession, localVoiceSupported } from "@/lib/voice/local";
 import { RealtimeSession, type RealtimeCallbacks } from "@/lib/voice/realtime";
 
@@ -119,7 +120,7 @@ export function VoiceAgent({ region }: { region: string }) {
   const [error, setError] = useState("");
   const [queue, setQueue] = useState<Pending[]>([]);
   const [progress, setProgress] = useState("");
-  const session = useRef<RealtimeSession | LocalVoiceSession | null>(null);
+  const session = useRef<RealtimeSession | ElevenSession | LocalVoiceSession | null>(null);
   const spoken = useRef("");
   // True while proposals wait for clicks: voice can never confirm or add decisions meanwhile.
   const pendingRef = useRef(false);
@@ -241,14 +242,18 @@ export function VoiceAgent({ region }: { region: string }) {
     // OpenAI Realtime when the server has a key; otherwise the local mode (browser recognition + PMW's command
     // router, with ElevenLabs speech when configured).
     const realtime = new RealtimeSession(callbacks);
-    let current: RealtimeSession | LocalVoiceSession = realtime;
+    let current: RealtimeSession | ElevenSession | LocalVoiceSession = realtime;
     session.current = current;
     try {
       const response = await fetch("/api/voice/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const data = await response.json() as { clientSecret?: string; error?: string; local?: boolean; tts?: boolean };
+      const data = await response.json() as { clientSecret?: string; conversationToken?: string; error?: string; local?: boolean; tts?: boolean };
       if (session.current !== current) return;
       if (response.ok && data.clientSecret) {
         await realtime.start(data.clientSecret);
+      } else if (response.ok && data.conversationToken) {
+        current = new ElevenSession(callbacks);
+        session.current = current;
+        await current.start(data.conversationToken);
       } else if (data.local && localVoiceSupported()) {
         current = new LocalVoiceSession(callbacks, Boolean(data.tts));
         session.current = current;

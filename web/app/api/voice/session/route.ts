@@ -6,7 +6,17 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return voiceJson({ error: "This request must come from PMW." }, 403);
   const apiKey = process.env.OPENAI_API_KEY;
-  // Without OpenAI the browser falls back to the local mode (speech recognition + PMW's command router);
+  // Without OpenAI: the ElevenLabs conversational agent, when configured. The browser gets a short-lived
+  // conversation token (about 10 minutes); the API key never leaves the server.
+  const eleven = process.env.ELEVENLABS_API_KEY, agent = process.env.ELEVENLABS_AGENT_ID;
+  if (!apiKey && eleven && agent) {
+    try {
+      const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agent)}`, { headers: { "xi-api-key": eleven } });
+      const data = await res.json().catch(() => ({})) as { token?: string };
+      if (res.ok && data.token) return voiceJson({ provider: "elevenlabs", conversationToken: data.token });
+    } catch { /* fall through to the local mode */ }
+  }
+  // Without either, the browser falls back to the local mode (speech recognition + PMW's command router);
   // tts says whether ElevenLabs speech is available for its replies.
   if (!apiKey) return voiceJson({ error: "Voice is not configured yet. Add OPENAI_API_KEY to the server environment.", local: true, tts: Boolean(process.env.ELEVENLABS_API_KEY) }, 503);
   try {

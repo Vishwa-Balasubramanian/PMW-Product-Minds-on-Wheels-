@@ -20,6 +20,6 @@ export default defineConfig({
     reuseExistingServer: false,
     env: { PMW_DB: path.resolve('..', 'db', 'pmw-smoke-run.sqlite'),
       VERCEL: '', PMW_USE_REMOTE: '0', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '',
-      OPENAI_API_KEY: '' },
+      OPENAI_API_KEY: '', ELEVENLABS_API_KEY: '', ELEVENLABS_AGENT_ID: '' },
   },
 });
