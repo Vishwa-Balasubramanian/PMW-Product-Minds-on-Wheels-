@@ -1,0 +1,1 @@
+Whatever we have built till now I need you to host it via vercel and add no indexing trackers in it
