@@ -14,7 +14,7 @@ export async function HappinessMeterCard({
 
   return (
     <Section title="Customer pain addressed" aside="Share of negative comments covered by approved requirements">
-      <HappinessMeter data={data} loading={false} />
+      <HappinessMeter data={data} />
     </Section>
   );
 }
