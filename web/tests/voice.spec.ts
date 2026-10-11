@@ -195,6 +195,57 @@ test("briefing distinguishes baseline and new conflicts; gaps navigate to data h
   await expect(page.getByRole("link", { name: "Data health", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
+test("agent investigation is read-only, region-safe and grounded in stored evidence", async ({ context, page }) => {
+  const r = req();
+  const id = String(r.id);
+  const before = read("SELECT status, confidence, challenged, updated_at FROM requirements WHERE id=?", id)[0];
+  const result = await (await call(page.request, "investigate_requirement", { id }, "Investigate this requirement")).json();
+  expect(result.ok).toBe(true);
+  expect(result.data.priority).toBe(r.priority);
+  expect(result.data.recommendation_reason).toContain(String(r.priority));
+  expect(result.data.challenge_preview.issues.length).toBe(JSON.parse(String(r.challenge)).issues.length);
+  for (const q of result.data.supporting_quotes) expect(read("SELECT text FROM feedback WHERE id=?", q.id)[0].text).toContain(q.text.slice(0, 60));
+  expect(read("SELECT status, confidence, challenged, updated_at FROM requirements WHERE id=?", id)[0]).toEqual(before);
+  await context.addCookies([{ name: "pmw_region", value: "US", url: base }]);
+  const us = await (await call(page.request, "investigate_requirement", { id })).json();
+  if (us.ok) for (const q of us.data.supporting_quotes) expect(q.market).toBe("US");
+});
+
+test("agent proposals create one-use tokens and audit rows; only a confirmation changes status", async ({ page }) => {
+  const rows = read("SELECT id, status, updated_at FROM requirements WHERE vehicle='G70' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 3");
+  const spoken = "Agent test: investigate the top requirements and take the necessary actions";
+  try {
+    const items = rows.map((r, i) => ({ id: r.id, action: ["approve", "validate", "reject"][i], rationale: `Agent test rationale ${i + 1}.` }));
+    const result = await (await call(page.request, "propose_decisions", { items }, spoken)).json();
+    expect(result.confirmations).toHaveLength(3);
+    expect(rows.map((r) => read("SELECT status FROM requirements WHERE id=?", r.id)[0].status)).toEqual(["proposed", "proposed", "proposed"]);
+    for (const [i, r] of rows.entries()) {
+      const rec = read("SELECT * FROM audit_events WHERE entity_id=? AND action=? ORDER BY id DESC LIMIT 1", r.id, `voice: recommended ${items[i].action}`)[0];
+      expect(rec.rationale).toBe(spoken);
+      expect(String(rec.after)).toContain(`Agent test rationale ${i + 1}.`);
+    }
+    // Confirm the validate proposal: the requirement moves to Needs Validation with the AI rationale in its audit.
+    const validate = result.confirmations.find((c: { decision: string }) => c.decision === "validate");
+    expect((await confirm(page.request, validate.token, true)).status()).toBe(200);
+    expect(read("SELECT status FROM requirements WHERE id=?", validate.id)[0].status).toBe("validate");
+    const pm = read("SELECT rationale FROM audit_events WHERE entity_id=? AND action='requested validation before deciding' ORDER BY id DESC LIMIT 1", validate.id)[0];
+    expect(pm.rationale).toBe("AI proposal confirmed by PM: Agent test rationale 2.");
+    expect((await confirm(page.request, validate.token, true)).status()).toBe(409);
+    // Skipping leaves the rest unchanged.
+    for (const c of result.confirmations.filter((x: { decision: string }) => x.decision !== "validate")) {
+      expect((await confirm(page.request, c.token, false)).status()).toBe(200);
+      expect(read("SELECT status FROM requirements WHERE id=?", c.id)[0].status).toBe("proposed");
+    }
+    // A decided requirement cannot be proposed again until the PM reopens it.
+    write("UPDATE requirements SET status='approved' WHERE id=?", String(rows[0].id));
+    const blocked = await call(page.request, "propose_decisions", { items: [{ id: rows[0].id, action: "reject", rationale: "Agent test." }] });
+    expect(blocked.status()).toBe(400);
+    expect((await blocked.json()).summary).toContain("Reopen");
+  } finally {
+    for (const r of rows) write("UPDATE requirements SET status=?, updated_at=? WHERE id=?", String(r.status), String(r.updated_at), String(r.id));
+  }
+});
+
 test("voice APIs reject cross-origin requests", async ({ page }) => {
   for (const endpoint of ["session", "tools", "confirm"]) {
     const response = await page.request.post(`/api/voice/${endpoint}`, { headers: { origin: "https://another.example" }, data: {} });

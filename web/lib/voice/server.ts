@@ -8,7 +8,11 @@ import {
   listSignals, listVehicles, missingVoices, portfolio, representation, voiceBriefing, type Viewer,
 } from "@/lib/gate";
 import type { Quote, Requirement } from "@/lib/types";
-import { noVoiceData, REQUIREMENT_FILTERS, VEHICLE_VIEWS, type VoiceResult, type VoiceSource, type VoiceTool } from "./config";
+import { isRepresentationIssue, recommendationReason } from "@/lib/board";
+import { QUADRANT } from "@/lib/types";
+import { noVoiceData, REQUIREMENT_FILTERS, VEHICLE_VIEWS, type VoiceDecision, type VoiceResult, type VoiceSource, type VoiceTool } from "./config";
+
+const QUADRANT_LABEL = Object.fromEntries(Object.entries(QUADRANT).map(([k, v]) => [k, v.label])) as Record<keyof typeof QUADRANT, string>;
 
 export const voiceActor = (viewer: Viewer): Viewer => ({ ...viewer, actor: "PM (voice)" });
 const BROWSER_COOKIE = "pmw_voice_browser";
@@ -77,13 +81,24 @@ const BOARD_FILTER: Record<string, string> = {
   act: "rec=act", validate: "rec=validate", monitor: "rec=monitor", park: "rec=park", quick_win: "rec=quick", weak_evidence: "conf=low",
 };
 
+type Decision = VoiceDecision;
 type PendingDecision = {
-  id: string; title: string; decision: "approve" | "reject"; spoken: string;
+  id: string; title: string; decision: Decision; spoken: string;
+  /** The agent's evidence-backed reason, when proposed by the agentic workflow. */
+  rationale?: string;
   browser: string; region: string; expiresAt: number; updatedAt: string; status: string;
 };
+const DECISION_LABEL: Record<Decision, { done: string; past: string }> = {
+  approve: { done: "Approved", past: "approved" },
+  reject: { done: "Rejected", past: "rejected" },
+  validate: { done: "Validation requested", past: "sent for validation" },
+};
+const MAX_PROPOSALS = 5;
 
-async function prepareDecision(viewer: Viewer, r: Requirement, decision: unknown, spoken: string): Promise<NonNullable<VoiceResult["confirmation"]>> {
-  if (decision !== "approve" && decision !== "reject") throw new Error("Choose approve or reject.");
+async function prepareDecision(viewer: Viewer, r: Requirement, decision: unknown, spoken: string, rationale?: string): Promise<NonNullable<VoiceResult["confirmation"]>> {
+  if (decision !== "approve" && decision !== "reject" && decision !== "validate") throw new Error("Choose approve, reject or validate.");
+  // Same rule as the board: a decided requirement must be reopened by the PM before a new decision.
+  if (r.status === "approved" || r.status === "rejected") throw new Error(`This requirement is already ${r.status}. Reopen it on screen first.`);
   const store = await cookies();
   let browser = store.get(BROWSER_COOKIE)?.value;
   if (!browser) {
@@ -92,12 +107,12 @@ async function prepareDecision(viewer: Viewer, r: Requirement, decision: unknown
   }
   const token = randomUUID();
   const expiresAt = Date.now() + 5 * 60_000;
-  const pending: PendingDecision = { id: r.id, title: r.title, decision, spoken, browser, region: viewer.region, expiresAt, updatedAt: r.updated_at, status: r.status };
+  const pending: PendingDecision = { id: r.id, title: r.title, decision, spoken, rationale, browser, region: viewer.region, expiresAt, updatedAt: r.updated_at, status: r.status };
   await writeBatch([
     { sql: "DELETE FROM settings WHERE key LIKE 'voice_decision:%' AND json_extract(value, '$.expiresAt') < ?", args: [Date.now()] },
     { sql: "INSERT INTO settings (key, value) VALUES (?, ?)", args: [`voice_decision:${token}`, JSON.stringify(pending)] },
   ]);
-  return { token, id: r.id, title: r.title, decision, expiresAt };
+  return { token, id: r.id, title: r.title, decision, expiresAt, rationale };
 }
 
 export async function executeVoiceTool(viewer: Viewer, tool: VoiceTool, params: Record<string, unknown>, spoken: string): Promise<VoiceResult> {
@@ -219,6 +234,32 @@ export async function executeVoiceTool(viewer: Viewer, tool: VoiceTool, params: 
     await writeBatch([{ sql: "INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", args: [key, data.as_of] }]);
     return { ok: true, summary: `${data.pending_count} pending decisions; ${data.existing_conflicts} existing conflicts; ${data.gaps.length} models with coverage gaps. ${since ? `${data.new_conflicts.length} new conflicts since the previous briefing.` : "First briefing: this establishes the baseline for new conflicts."}`, confidence: { value: null, level: "varies by requirement; see pending decisions" }, sources: [{ id: "requirements", source: "PMW requirement register" }, { id: "representation", source: "BMW feedback and sales coverage" }], data };
   }
+  if (tool === "propose_decisions") {
+    const items = Array.isArray(params.items) ? params.items : [];
+    if (!items.length || items.length > MAX_PROPOSALS) throw new Error(`Invalid proposals: send 1 to ${MAX_PROPOSALS} items.`);
+    const confirmations: NonNullable<VoiceResult["confirmations"]> = [];
+    const failed: { id: string; error: string }[] = [];
+    for (const item of items as Record<string, unknown>[]) {
+      const itemId = requireText(item?.id, "requirement ID");
+      const rationale = requireText(item?.rationale, "rationale", 600);
+      const found = await getRequirement(actor, itemId);
+      if (!found) { failed.push({ id: itemId, error: "I don't have data for that" }); continue; }
+      try {
+        const c = await prepareDecision(viewer, found.requirement, item.action, spoken, rationale);
+        confirmations.push(c);
+        // AI recommendations are logged separately from the PM's later confirmation.
+        await logVoice(viewer, `recommended ${c.decision}`, spoken, `Proposed for PM confirmation: ${rationale}`, itemId);
+      } catch (e) {
+        failed.push({ id: itemId, error: e instanceof Error ? e.message : "Could not prepare this proposal." });
+      }
+    }
+    if (!confirmations.length) throw new Error(`Invalid proposals: ${failed.map((f) => `${f.id}: ${f.error}`).join("; ")}`);
+    return {
+      ok: true, summary: `${confirmations.length} proposal${confirmations.length === 1 ? "" : "s"} awaiting the PM's click on screen. Nothing has been applied.`,
+      confidence: NOT_APPLICABLE, sources: confirmations.map((c) => ({ id: c.id, source: "PMW confirmation dialog" })),
+      confirmations, data: { status: "awaiting_confirmation", proposed: confirmations.map(({ id, decision }) => ({ id, decision })), failed },
+    };
+  }
   const id = requireText(params.id, "requirement ID");
   const detail = await getRequirement(actor, id);
   if (!detail) return noVoiceData();
@@ -242,6 +283,32 @@ export async function executeVoiceTool(viewer: Viewer, tool: VoiceTool, params: 
       const quotes = rankedQuotes(detail.quotes).slice(0, count).map(({ id, text, source, market, role }) => ({ id, text, source, market, role }));
       if (!quotes.length) return noVoiceData();
       return { ...base, summary: `${quotes.length} real customer comments available${quotes.length < count ? ` (fewer than the ${count} requested)` : ""}.`, quotes, quoteLabel: "AI voice reading a real customer comment", sources: quotes.map(({ id, source, market, role }) => ({ id, source, market, role })) };
+    }
+    case "investigate_requirement": {
+      const weights = await getWeights();
+      const quotes = rankedQuotes(detail.quotes);
+      const pick = (role: string, n: number) => quotes.filter((q) => q.role === role).slice(0, n).map(({ id, text, source, market, severity }) => ({ id, text: text.slice(0, 300), source, market, severity }));
+      const events = (await auditFor(actor, id)).filter((e) => e.entity_type !== "voice").slice(0, 5)
+        .map((e) => ({ ts: e.ts, actor: e.actor, action: e.action, rationale: e.rationale?.slice(0, 160) ?? null }));
+      const hint = ({ act: "approve", validate: "validate", monitor: "validate or approve", park: "validate or reject" } as const)[r.quadrant];
+      return {
+        ...base, href: requirementHref(r, "evidence"),
+        summary: `${r.id}: priority ${r.priority}, confidence ${r.confidence}, ${QUADRANT_LABEL[r.quadrant]}, status ${r.status}.`,
+        data: {
+          id, title: r.title, status: r.status, kind: r.kind, requirement: r.requirement, customer_need: r.customer_need, root_cause: r.root_cause,
+          priority: r.priority, confidence: r.confidence, quadrant: r.quadrant,
+          recommendation_reason: recommendationReason(r.priority, r.confidence, weights.thresholds),
+          quadrant_hint: hint,
+          priority_factors: Object.fromEntries(Object.entries(r.priority_factors).map(([k, f]) => [k, { value: f.value, note: f.note }])),
+          confidence_factors: Object.fromEntries(Object.entries(r.confidence_factors).map(([k, f]) => [k, { value: f.value, note: f.note }])),
+          supporting_quotes: pick("supports", 5), contradicting_quotes: pick("contradicts", 2), hidden_comments_by_market: detail.hidden,
+          survey: r.survey.slice(0, 6), conflicts: r.conflicts,
+          // Precomputed red-team check, shown read-only; run_challenge would apply it.
+          challenge_preview: { applied: r.challenged, issues: r.challenge.issues, revised_confidence: r.challenge.revised_confidence },
+          market_representation: r.challenge.issues.map((i) => i.text).filter(isRepresentationIssue),
+          assumptions: r.assumptions, uncertainties: r.uncertainties, recent_decisions: events,
+        },
+      };
     }
     case "request_decision":
       return { ...base, summary: "Awaiting a click in the confirmation dialog. No decision has been applied.", confirmation: await prepareDecision(viewer, r, params.decision, spoken), data: { status: "awaiting_confirmation" } };
@@ -267,8 +334,9 @@ export async function confirmVoiceDecision(viewer: Viewer, token: string, confir
     await audit("Expired or stale confirmation. No decision applied.");
     throw new Error("This confirmation expired or the requirement changed. Please request the decision again.");
   }
-  const result = await applyAction(voiceActor(viewer), pending.id, { action: pending.decision, rationale: pending.spoken });
-  await audit(result.ok ? `${pending.decision === "approve" ? "Approved" : "Rejected"} after the PM clicked Confirm.` : result.error);
+  const rationale = pending.rationale ? `AI proposal confirmed by PM: ${pending.rationale}` : pending.spoken;
+  const result = await applyAction(voiceActor(viewer), pending.id, { action: pending.decision, rationale });
+  await audit(result.ok ? `${DECISION_LABEL[pending.decision].done} after the PM clicked Confirm.` : result.error);
   if (!result.ok) throw new Error(result.error);
-  return { ok: true, summary: `${pending.id} ${pending.decision === "approve" ? "approved" : "rejected"} after your confirmation.`, confidence: await confidenceFor(detail.requirement), sources: [{ id: pending.id, source: "PMW decision audit" }], href: requirementHref(detail.requirement, "activity") };
+  return { ok: true, summary: `${pending.id} ${DECISION_LABEL[pending.decision].past} after your confirmation.`, data: { id: pending.id, decision: pending.decision }, confidence: await confidenceFor(detail.requirement), sources: [{ id: pending.id, source: "PMW decision audit" }], href: requirementHref(detail.requirement, "activity") };
 }

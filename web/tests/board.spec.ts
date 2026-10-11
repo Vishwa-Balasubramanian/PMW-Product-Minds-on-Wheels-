@@ -58,11 +58,12 @@ test('filters, search, sort and list view use real scores', async ({ page }) => 
 
 test('a card opens the evidence drawer and Escape closes it', async ({ page }) => {
   await region(page, 'ALL');
-  const r = read<{ id: string; title: string }>("SELECT id, title FROM requirements WHERE vehicle='G70' AND kind='signal' ORDER BY priority DESC LIMIT 1")[0];
+  const r = read<{ id: string; title: string }>("SELECT id, title FROM requirements WHERE vehicle='G70' AND kind='signal' AND status='proposed' ORDER BY priority DESC LIMIT 1")[0];
   await page.goto('/vehicles/G70');
-  await card(page, r.id).getByRole('link', { name: 'View evidence' }).click();
+  await card(page, r.id).locator('.board-card-title').click();
   const drawer = page.getByRole('dialog', { name: new RegExp(r.id) });
   await expect(drawer).toBeVisible();
+  await drawer.getByRole('tab', { name: 'Evidence', exact: true }).click();
   await expect(drawer.getByRole('tab', { name: 'Evidence', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(drawer.getByText('Why the AI recommends this.')).toBeVisible();
   await expect(drawer.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();

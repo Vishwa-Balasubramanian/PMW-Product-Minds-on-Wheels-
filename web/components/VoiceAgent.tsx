@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { noVoiceData, VOICE_TOOLS, type VoiceResult, type VoiceTool } from "@/lib/voice/config";
+import { agentFocus } from "@/lib/agentFocus";
+import { noVoiceData, VOICE_TOOLS, type VoiceConfirmation, type VoiceDecision, type VoiceResult, type VoiceTool } from "@/lib/voice/config";
 import { RealtimeSession } from "@/lib/voice/realtime";
 
-type Pending = NonNullable<VoiceResult["confirmation"]>;
+type Pending = VoiceConfirmation;
 type Phase = "idle" | "connecting" | "live";
 
 const ERROR_MS = 5_000;
@@ -22,35 +23,88 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-function DecisionConfirmation({ pending, onComplete }: { pending: Pending; onComplete: (result: VoiceResult) => void }) {
+const DECISION_TEXT: Record<VoiceDecision, { title: string; confirm: string }> = {
+  approve: { title: "Approve", confirm: "Confirm approval" },
+  reject: { title: "Reject", confirm: "Confirm rejection" },
+  validate: { title: "Request validation for", confirm: "Confirm validation request" },
+};
+
+/** One proposal at a time. Nothing changes until the PM clicks Confirm; Skip and Cancel all are audited too. */
+function ProposalQueue({ items, onDone }: { items: Pending[]; onDone: (outcomes: VoiceResult[]) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const locked = useRef(false);
+  const outcomes = useRef<VoiceResult[]>([]);
+  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
+  const item = items[index];
   useEffect(() => { dialog.current?.showModal(); }, []);
+
+  function next(result: VoiceResult) {
+    outcomes.current.push(result);
+    setError("");
+    if (index + 1 >= items.length) return onDone(outcomes.current);
+    setIndex(index + 1);
+  }
+
   async function decide(confirm: boolean) {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
     setError("");
     try {
-      onComplete(await post<VoiceResult>("/api/voice/confirm", { token: pending.token, confirm }));
+      const result = await post<VoiceResult>("/api/voice/confirm", { token: item.token, confirm });
+      if (confirm) {
+        agentFocus.set(item.id, "done");
+        router.refresh(); // The card moves column once the server data changes.
+      } else agentFocus.remove(item.id);
+      next(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The decision could not be confirmed.");
+    } finally {
       locked.current = false;
       setBusy(false);
     }
   }
-  return <dialog ref={dialog} className="voice-confirm" aria-labelledby="voice-confirm-title" onCancel={(event) => { event.preventDefault(); void decide(false); }}>
-    <h2 id="voice-confirm-title">{pending.decision === "approve" ? "Approve" : "Reject"} this requirement?</h2>
-    <p className="mt-3"><b>{pending.id}</b> · {pending.title}</p>
+
+  async function cancelAll() {
+    if (locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    for (const rest of items.slice(index)) {
+      agentFocus.remove(rest.id);
+      outcomes.current.push(await post<VoiceResult>("/api/voice/confirm", { token: rest.token, confirm: false })
+        .catch((e) => ({ ...noVoiceData(), summary: e instanceof Error ? e.message : "Could not cancel." })));
+    }
+    onDone(outcomes.current);
+  }
+
+  const text = DECISION_TEXT[item.decision];
+  return <dialog ref={dialog} className="voice-confirm" aria-labelledby="voice-confirm-title" onCancel={(event) => { event.preventDefault(); if (!busy) void decide(false); }}>
+    {items.length > 1 && <p className="eyebrow">Proposal {index + 1} of {items.length} · from the PMW agent</p>}
+    <h2 id="voice-confirm-title" className={items.length > 1 ? "mt-2" : ""}>{text.title} this requirement?</h2>
+    <p className="mt-3"><b>{item.id}</b> · {item.title}</p>
+    {item.rationale && <p className="voice-rationale"><b>AI rationale.</b> {item.rationale}</p>}
     <p className="mt-3 text-ink-2">Requested by voice. Nothing changes until you confirm here.</p>
     {error && <p role="alert" className="mt-3 text-danger">{error}</p>}
-    <div className="mt-5 flex justify-end gap-3">
-      <button autoFocus className="btn-outline" disabled={busy} onClick={() => error ? onComplete({ ...noVoiceData(), summary: error }) : void decide(false)}>{error ? "Close" : "Cancel"}</button>
-      <button className="btn-primary" disabled={busy || !!error} onClick={() => void decide(true)}>{busy ? "Saving…" : `Confirm ${pending.decision === "approve" ? "approval" : "rejection"}`}</button>
+    <div className="mt-5 flex flex-wrap justify-end gap-3">
+      {items.length > 1 && <button className="btn-outline mr-auto" disabled={busy} onClick={() => void cancelAll()}>Cancel all</button>}
+      <button autoFocus className="btn-outline" disabled={busy} onClick={() => error ? next({ ...noVoiceData(), summary: error }) : void decide(false)}>{error ? "Close" : items.length > 1 ? "Skip" : "Cancel"}</button>
+      <button className="btn-primary" disabled={busy || !!error} onClick={() => void decide(true)}>{busy ? "Saving…" : text.confirm}</button>
     </div>
   </dialog>;
+}
+
+/** Short progress text for the pill next to the mic, derived from the tool being run. */
+function progressFor(name: string, params: Record<string, unknown>, investigated: number): string {
+  switch (name) {
+    case "critical_issues": case "find_requirements": case "daily_briefing": return "Finding priorities…";
+    case "investigate_requirement": return `Investigating #${investigated} · ${String(params.id ?? "")}`;
+    case "propose_decisions": return `Preparing ${Array.isArray(params.items) ? params.items.length : ""} proposals…`;
+    case "run_challenge": return "Challenging the evidence…";
+    default: return "Working…";
+  }
 }
 
 export function VoiceAgent({ region }: { region: string }) {
@@ -61,10 +115,16 @@ export function VoiceAgent({ region }: { region: string }) {
   const [speaking, setSpeaking] = useState(false);
   const [hearing, setHearing] = useState(false);
   const [error, setError] = useState("");
-  const [pending, setPending] = useState<Pending | null>(null);
+  const [queue, setQueue] = useState<Pending[]>([]);
+  const [progress, setProgress] = useState("");
   const session = useRef<RealtimeSession | null>(null);
   const spoken = useRef("");
-  const pendingRef = useRef<Pending | null>(null);
+  // True while proposals wait for clicks: voice can never confirm or add decisions meanwhile.
+  const pendingRef = useRef(false);
+  // Bumped on stop so results that arrive after a cancel are discarded.
+  const generation = useRef(0);
+  const inFlight = useRef(0);
+  const investigated = useRef(0);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -93,7 +153,7 @@ export function VoiceAgent({ region }: { region: string }) {
     errorTimer.current = setTimeout(() => setError(""), ERROR_MS);
   }, []);
 
-  const stop = useCallback(() => { session.current?.stop(); }, []);
+  const stop = useCallback(() => { generation.current++; session.current?.stop(); }, []);
 
   const touch = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -105,18 +165,41 @@ export function VoiceAgent({ region }: { region: string }) {
     if (!VOICE_TOOLS.includes(name as VoiceTool)) return JSON.stringify({ ...noVoiceData(), summary: `Unknown tool ${name}.` });
     if (pendingRef.current) return JSON.stringify({ ...noVoiceData(), summary: "A decision is awaiting a click on screen. Voice cannot confirm it." });
     if (!spoken.current) return JSON.stringify({ ...noVoiceData(), summary: "No user transcript received. Ask the PM to repeat the request." });
+    const run = generation.current;
+    if (name === "critical_issues" || name === "find_requirements") investigated.current = 0;
+    if (name === "investigate_requirement") {
+      investigated.current++;
+      if (typeof params.id === "string") agentFocus.set(params.id, "investigating");
+    }
+    setProgress(progressFor(name, params, investigated.current));
+    inFlight.current++;
     try {
       const result = await post<VoiceResult>("/api/voice/tools", { tool: name, params, spokenRequest: spoken.current });
-      if (result.href) router.push(result.href);
+      if (run !== generation.current) return JSON.stringify({ ...noVoiceData(), summary: "Cancelled by the PM. No action applied." });
+      if (name === "investigate_requirement" && result.href) {
+        // Keep the board in view: open the requirement's vehicle board only if its card is not on screen.
+        const id = String(params.id);
+        if (!document.querySelector(`[data-card-id=${JSON.stringify(id)}]`)) router.push(result.href.split("?")[0]);
+        agentFocus.set(id, "investigated");
+      } else if (result.href) router.push(result.href);
       if (MUTATING.includes(name as VoiceTool)) router.refresh();
-      if (result.confirmation) {
-        pendingRef.current = result.confirmation;
-        setPending(result.confirmation);
+      const proposals = result.confirmations ?? (result.confirmation ? [result.confirmation] : []);
+      if (proposals.length) {
+        for (const p of proposals) agentFocus.set(p.id, "proposed");
+        pendingRef.current = true;
+        setQueue(proposals);
       }
-      // The one-use confirmation token never reaches the model.
-      return JSON.stringify({ ...result, confirmation: result.confirmation ? { status: "awaiting_confirmation" } : undefined });
+      // One-use confirmation tokens never reach the model.
+      return JSON.stringify({
+        ...result,
+        confirmation: result.confirmation ? { status: "awaiting_confirmation" } : undefined,
+        confirmations: result.confirmations?.map(({ id, decision }) => ({ id, decision, status: "awaiting_confirmation" })),
+      });
     } catch (e) {
+      if (name === "investigate_requirement" && typeof params.id === "string") agentFocus.remove(params.id);
       return JSON.stringify({ ...noVoiceData(), summary: e instanceof Error ? e.message : "The voice action failed." });
+    } finally {
+      inFlight.current--;
     }
   }, [router, touch]);
 
@@ -136,9 +219,17 @@ export function VoiceAgent({ region }: { region: string }) {
         setPhase("idle");
         setSpeaking(false);
         setHearing(false);
+        setProgress("");
+        // Proposals stay highlighted until the PM resolves the queue; investigation marks go.
+        for (const [id, state] of Object.entries(agentFocus.get())) if (state !== "proposed") agentFocus.remove(id);
       },
       onError: showError,
-      onSpeaking: (value) => { setSpeaking(value); touch(); },
+      onSpeaking: (value) => {
+        setSpeaking(value);
+        touch();
+        // The pill fades once the agent has finished speaking and no tool is running.
+        if (!value && !inFlight.current) setTimeout(() => { if (!inFlight.current) setProgress(""); }, 2_500);
+      },
       onHearing: (value) => { setHearing(value); touch(); },
       // Transcripts are not displayed; the final user text is kept for the audit trail.
       onTranscript: ({ role, text, final }) => { if (role === "user" && final && text) spoken.current = text; },
@@ -155,12 +246,11 @@ export function VoiceAgent({ region }: { region: string }) {
     }
   }
 
-  function confirmed(result: VoiceResult) {
-    pendingRef.current = null;
-    setPending(null);
-    if (result.href) router.push(result.href);
+  function resolved(outcomes: VoiceResult[]) {
+    pendingRef.current = false;
+    setQueue([]);
     router.refresh();
-    session.current?.sendContext(`PMW confirmation dialog result: ${JSON.stringify({ ok: result.ok, summary: result.summary })}`);
+    session.current?.sendContext(`PMW confirmation dialog results (clicked by the PM): ${JSON.stringify(outcomes.map((o) => ({ ok: o.ok, summary: o.summary })))}`);
   }
 
   // Keep the agent aware of where the PM is.
@@ -187,6 +277,7 @@ export function VoiceAgent({ region }: { region: string }) {
   return <>
     <div className="voice-agent" data-state={state}>
       {error && <p className="voice-error" role="alert">{error}</p>}
+      {!error && progress && phase === "live" && !queue.length && <p className="voice-progress" role="status">{progress}</p>}
       <button className="voice-mic" aria-label={label} title={label} aria-pressed={phase !== "idle"} onClick={() => phase === "idle" ? void start() : stop()}>
         <span className="voice-glow" aria-hidden="true" />
         {phase === "idle"
@@ -194,6 +285,6 @@ export function VoiceAgent({ region }: { region: string }) {
           : <span className="voice-bars" aria-hidden="true"><i /><i /><i /><i /></span>}
       </button>
     </div>
-    {pending && <DecisionConfirmation key={pending.token} pending={pending} onComplete={confirmed} />}
+    {queue.length > 0 && <ProposalQueue key={queue[0].token} items={queue} onDone={resolved} />}
   </>;
 }

@@ -63,6 +63,9 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
           <div className="board-heading">
             <H id="board-heading">Product Requirements Board</H>
             <p>AI proposes; you decide.</p>
+            <ul className="board-legend" aria-label="Card side line shows the AI recommendation">
+              {(Object.keys(QUADRANT) as Quadrant[]).map((q) => <li key={q} className={`rec-dot-${q}`}>{QUADRANT[q].label}</li>)}
+            </ul>
             {active && <p className="board-ranking" data-testid="ranking-note"><b>Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by}</p>}
             {selected && !selected.available && <p className="board-availability">{selected.name} is not sold in {viewer.label}, so there is no evidence to review here.</p>}
             {selected?.thin && <p className="board-availability"><b>Thin evidence.</b> No customer comments from {viewer.label} for the {selected.name}. Requirements rest on survey means only.</p>}

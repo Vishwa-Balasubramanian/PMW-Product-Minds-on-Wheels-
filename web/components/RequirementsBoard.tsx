@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import { COLUMNS, SORTS, confidenceLevel, moveFor, type BoardCard, type BoardFilters, type BoardVehicle, type Move } from "@/lib/board";
+import { useAgentFocus } from "@/lib/agentFocus";
 import { MOSCOW, moscowFor } from "@/lib/moscow";
 import { QUADRANT, STATUS_LABEL, type Quadrant, type Status } from "@/lib/types";
 
@@ -222,8 +223,14 @@ function Card({ c, threshold, openHref, menuOpen, dragging, onDragStart, onDragE
 }) {
   const weak = confidenceLevel(c.confidence, threshold) === "low";
   const band = moscowFor(c.priority);
+  // Highlight while the voice agent investigates, proposes or just applied a decision.
+  const focus = useAgentFocus(c.id);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focus === "investigating" || focus === "done") ref.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [focus]);
   return (
-    <article className={`board-card band-${band.key} ${dragging ? "is-dragging" : ""}`} draggable onDragStart={onDragStart} onDragEnd={onDragEnd} data-card-id={c.id} aria-label={c.title}>
+    <article ref={ref} data-agent={focus} data-band={band.key} className={`board-card rec-line-${c.quadrant} ${dragging ? "is-dragging" : ""}`} draggable onDragStart={onDragStart} onDragEnd={onDragEnd} data-card-id={c.id} aria-label={c.title}>
       <div className="board-card-top">
         <Link href={openHref(c.id)} scroll={false} className="board-card-title">{c.title}</Link>
         <button type="button" className="board-card-move" aria-haspopup="menu" aria-expanded={menuOpen} aria-label={`Move ${c.id}`} title="Move to another column" onClick={onMenu}>⋯</button>
@@ -250,7 +257,6 @@ function Card({ c, threshold, openHref, menuOpen, dragging, onDragStart, onDragE
           {c.challenged && <li className="flag-challenge">Challenged</li>}
         </ul>
       )}
-      <Link href={openHref(c.id, "evidence")} scroll={false} className="board-card-link">View evidence <span aria-hidden="true">→</span></Link>
     </article>
   );
 }

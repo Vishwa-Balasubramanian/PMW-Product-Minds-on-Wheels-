@@ -345,6 +345,16 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
 .export-options a:hover { background: var(--color-monitor-soft); color: var(--color-blue); }
 @media (max-width: 639px) { .vehicle-titlebar { align-items: flex-start; } .vehicle-titlebar .vehicle-heading img { display: none; } }
 
+/* Voice agent progress and card focus */
+.voice-progress { max-width: min(320px, calc(100vw - 32px)); margin-bottom: 10px; padding: 6px 12px; border-radius: 999px; background: #fff; border: 1px solid #dce5f3; box-shadow: 0 6px 20px #14203318; font-size: 12px; color: var(--color-ink-2); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: voice-appear .2s ease-out; }
+.voice-progress::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--color-blue); vertical-align: middle; animation: voice-breathe 1.2s ease-in-out infinite; }
+.voice-rationale { margin-top: 12px; padding: 8px 10px; border-left: 2px solid var(--color-blue); background: var(--color-monitor-soft); font-size: 13px; color: var(--color-ink-2); }
+.board-card[data-agent=investigating] { border-color: var(--color-blue); box-shadow: 0 0 0 3px #1c69d433; animation: agent-pulse 1.2s ease-in-out infinite; }
+.board-card[data-agent=investigated] { border-color: #9dbdf0; }
+.board-card[data-agent=proposed] { border-color: var(--color-validate); box-shadow: 0 0 0 2px #925b0c26; }
+.board-card[data-agent=done] { border-color: var(--color-act); box-shadow: 0 0 0 3px #23744f33; }
+@keyframes agent-pulse { 50% { box-shadow: 0 0 0 6px #1c69d41a; } }
+@media (prefers-reduced-motion: reduce) { .board-card[data-agent=investigating], .voice-progress::before { animation: none; } }
 /* Desktop: the voice mic sits in the sidebar footer, so the board needs no room for it. */
 @media (min-width: 1024px) {
   .voice-agent { left: 148px; bottom: 23px; transform: none; align-items: flex-start; }
@@ -352,3 +362,56 @@ dialog { border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0
   .board-side, .board-list { padding-bottom: 16px; }
   .drawer-body { padding-bottom: 24px; }
 }
+/* ───────── BMW design layer: sharp geometry, near-black type, light headlines, BMW blue accents ───────── */
+:root { --color-ink: #262626; --color-ink-2: #4d4d4d; --color-ink-3: #6f6f6f; --color-line: #e4e4e4; --color-mist: #f6f6f6; }
+body { letter-spacing: .003em; }
+/* bmw.com uses square corners throughout */
+.card, .board-card, .board-column, .board-kpis, .board-filters, .board-filters select, .board-filters input, .board-layout-toggle,
+.board-notice, .board-move-menu, .board-move-menu button, .drawer-panel, .voice-confirm, .decision-reason, .voice-rationale, .nav-item,
+.btn, .btn-primary, .btn-outline, .export-options, .filter-chip, .board-heading .board-ranking, .board-heading .board-availability,
+.board-count, .board-card-flags li, .voice-progress, .voice-error { border-radius: 0; }
+.btn-primary { background: var(--color-blue); color: #fff; font-weight: 500; letter-spacing: .01em; transition: background .15s ease; }
+.btn-primary:hover { background: var(--color-blue-dark); }
+.btn-outline { background: #fff; border: 1px solid #bbb; color: var(--color-ink); transition: border-color .15s ease; }
+.btn-outline:hover { border-color: var(--color-ink); color: var(--color-ink); }
+/* Typography: light headlines, small uppercase labels */
+.page-heading, .vehicle-heading h1, .decision-title { font-weight: 300; letter-spacing: -.015em; }
+.board-heading h1, .board-heading h2 { font-size: 24px; font-weight: 300; letter-spacing: -.015em; }
+.board-column-head h2, .board-kpis dt, .board-filters label { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.board-column-head h2 { color: var(--color-ink); }
+.board-kpis dt, .board-filters label { color: var(--color-ink-3); }
+.board-filters select, .board-filters input { font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-ink); }
+.board-kpis dd { font-size: 26px; font-weight: 300; }
+.board-layout-toggle button { font-weight: 500; }
+.board-layout-toggle button[aria-pressed=true] { background: var(--color-ink); }
+.workspace-views a[aria-current=page] { font-weight: 600; }
+/* Kanban: quiet grey columns, white cards, 4px side line in the AI recommendation colour */
+.board-column { background: #f2f2f2; }
+.board-column.is-over { background: #e8f0fb; }
+.board-count { background: #fff; color: var(--color-ink); }
+.board-card { padding-left: 16px; border-color: #e6e6e6; box-shadow: none; transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease; }
+.board-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px #00000014; border-color: #d6d6d6; }
+.board-card::before { top: 0; bottom: 0; width: 4px; border-radius: 0; }
+.board-card.rec-line-act::before { background: var(--color-act); }
+.board-card.rec-line-validate::before { background: #e0a100; }
+.board-card.rec-line-monitor::before { background: var(--color-blue); }
+.board-card.rec-line-park::before { background: #a7adb4; }
+.board-card-title { font-weight: 600; }
+.board-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--color-ink-3); }
+.board-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.board-legend li::before { content: ""; width: 4px; height: 12px; background: currentColor; }
+.board-legend .rec-dot-act::before { background: var(--color-act); }
+.board-legend .rec-dot-validate::before { background: #e0a100; }
+.board-legend .rec-dot-monitor::before { background: var(--color-blue); }
+.board-legend .rec-dot-park::before { background: #a7adb4; }
+/* Sidebar: realistic BMW photography under a white fade, glass footer */
+.workspace-sidebar {
+  background:
+    linear-gradient(180deg, #ffffffeb 0%, #ffffffd9 34%, #ffffff8c 56%, #ffffff1f 78%, #ffffff00 100%),
+    url("/cars/G70.jpg") 50% 78% / cover no-repeat;
+  border-right: 1px solid var(--color-line);
+}
+.nav-item { color: var(--color-ink); border-left: 3px solid transparent; transition: background .15s ease, border-color .15s ease; }
+.nav-item:hover { background: #ffffffb3; }
+.nav-item[aria-current=page] { color: var(--color-blue); background: #ffffffe6; border-left-color: var(--color-blue); font-weight: 600; }
+.sidebar-footer { background: #ffffffd1; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top-color: #ffffff99; color: var(--color-ink-2); }

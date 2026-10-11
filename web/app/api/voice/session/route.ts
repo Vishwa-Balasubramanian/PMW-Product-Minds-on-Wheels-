@@ -28,9 +28,10 @@ export async function POST(request: Request) {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
               noise_reduction: { type: "near_field" },
-              turn_detection: { type: "server_vad", silence_duration_ms: 550, interrupt_response: true, create_response: true },
+              turn_detection: { type: "server_vad", silence_duration_ms: 450, interrupt_response: true, create_response: true },
             },
-            output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin" },
+            // Slightly brisker delivery for live demos.
+            output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin", speed: 1.1 },
           },
         },
       }),

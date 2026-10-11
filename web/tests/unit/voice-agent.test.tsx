@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { VoiceAgent } from "@/components/VoiceAgent";
 import type { RealtimeCallbacks } from "@/lib/voice/realtime";
 import type { VoiceResult } from "@/lib/voice/config";
+import { agentFocus } from "@/lib/agentFocus";
 
 const rt = vi.hoisted(() => ({
   callbacks: null as RealtimeCallbacks | null,
@@ -34,6 +35,7 @@ beforeEach(() => {
   fetchMock.mockReset().mockResolvedValue(json({ clientSecret: "ek_test" }));
   vi.stubGlobal("fetch", fetchMock);
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  agentFocus.clear();
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -111,4 +113,61 @@ it("reports a configuration error and returns to idle", async () => {
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("not configured"));
   expect(rt.start).not.toHaveBeenCalled();
   expect(mic().getAttribute("aria-pressed")).toBe("false");
+});
+
+it("agent proposals are confirmed one by one on screen; skip and cancel all are sent too", async () => {
+  await connect();
+  say("Investigate the top requirements and take the necessary actions");
+  const proposal = (n: number, decision: "approve" | "reject" | "validate") => ({ token: `secret-${n}`, id: `R-G70-00${n}`, title: `Requirement ${n}`, decision, expiresAt: Date.now() + 60_000, rationale: `Evidence ${n}.` });
+  fetchMock.mockResolvedValueOnce(json({ ...success, href: undefined, confirmations: [proposal(1, "approve"), proposal(2, "validate"), proposal(3, "reject")] }));
+  let output = "";
+  await act(async () => { output = await rt.callbacks!.onToolCall("propose_decisions", { items: [] }); });
+  expect(output).not.toContain("secret-");
+  expect(JSON.parse(output).confirmations).toEqual([
+    { id: "R-G70-001", decision: "approve", status: "awaiting_confirmation" },
+    { id: "R-G70-002", decision: "validate", status: "awaiting_confirmation" },
+    { id: "R-G70-003", decision: "reject", status: "awaiting_confirmation" },
+  ]);
+  expect(agentFocus.get()).toMatchObject({ "R-G70-001": "proposed", "R-G70-003": "proposed" });
+  expect(screen.getByText("Proposal 1 of 3 · from the PMW agent")).toBeTruthy();
+  expect(screen.getByText(/Evidence 1\./)).toBeTruthy();
+
+  // Voice cannot confirm while the queue is open.
+  say("Yes, approve all of them");
+  const count = fetchMock.mock.calls.length;
+  expect(await rt.callbacks!.onToolCall("propose_decisions", { items: [] })).toContain("awaiting a click");
+  expect(fetchMock.mock.calls.length).toBe(count);
+
+  fetchMock.mockResolvedValueOnce(json({ ...success, summary: "R-G70-001 approved after your confirmation." }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm approval" }));
+  await waitFor(() => expect(screen.getByText("Proposal 2 of 3 · from the PMW agent")).toBeTruthy());
+  expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual({ token: "secret-1", confirm: true });
+  expect(agentFocus.get()["R-G70-001"]).toBe("done");
+  expect(rt.refresh).toHaveBeenCalled();
+
+  fetchMock.mockResolvedValueOnce(json({ ...success, summary: "Decision cancelled. No change applied." }));
+  fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+  await waitFor(() => expect(screen.getByText("Proposal 3 of 3 · from the PMW agent")).toBeTruthy());
+  expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual({ token: "secret-2", confirm: false });
+
+  fetchMock.mockResolvedValueOnce(json({ ...success, summary: "Decision cancelled. No change applied." }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel all" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body)).toEqual({ token: "secret-3", confirm: false });
+  expect(rt.context.mock.calls.at(-1)![0]).toContain("R-G70-001 approved after your confirmation");
+});
+
+it("investigating highlights the card and shows progress without opening a panel", async () => {
+  await connect();
+  say("Investigate the climate requirement");
+  let release!: () => void;
+  fetchMock.mockReturnValueOnce(new Promise((r) => { release = () => r(json({ ...success, href: "/vehicles/G70?open=R-G70-001&tab=evidence" })); }));
+  let call!: Promise<string>;
+  act(() => { call = rt.callbacks!.onToolCall("investigate_requirement", { id: "R-G70-001" }); });
+  expect(agentFocus.get()["R-G70-001"]).toBe("investigating");
+  expect(screen.getByRole("status").textContent).toContain("Investigating #1 · R-G70-001");
+  await act(async () => { release(); await call; });
+  expect(agentFocus.get()["R-G70-001"]).toBe("investigated");
+  // The card is not on screen in this test, so the vehicle board opens (not the drawer).
+  expect(rt.push).toHaveBeenCalledWith("/vehicles/G70");
 });
