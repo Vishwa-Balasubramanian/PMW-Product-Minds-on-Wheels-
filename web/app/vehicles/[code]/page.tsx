@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
+import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { Header } from "@/components/Header";
+import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
 import { ScrollToCard } from "@/components/ScrollToCard";
-import { RequirementModels } from "@/components/RequirementModels";
-import { RequirementsBoard } from "@/components/RequirementsBoard";
 import { WeightsPanel } from "@/components/WeightsPanel";
 import { Matrix, QuadrantBadge, Section } from "@/components/ui";
 import {
-  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals, listVehicles,
+  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
 } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
@@ -33,36 +33,26 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   if (!vehicle) notFound();
   const viewer = await getViewer();
   const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
-  // List filter: a quadrant, or "quick" for quick wins (equipment BMW already sells).
-  const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
+  // List filter: a quadrant, "quick" for quick wins (equipment BMW already sells) or "conflict" for market conflict cards.
+  const qFilter = sp.q === "quick" || sp.q === "conflict" ? sp.q
+    : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
     listRequirements(viewer, code), getWeights(), missingVoices(code), vehicleTotals(code), getFactorLabels(), getActiveWeights(),
     storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
+  const conflicts = all.filter((r) => r.kind === "market_conflict");
   const search = view === "inbox" && typeof sp.search === "string" ? sp.search.trim().slice(0, 256) : "";
-  const filtered = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const filtered = qFilter === "quick" ? quickWins : qFilter === "conflict" ? conflicts : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
   const reqs = search ? filtered.filter((r) => r.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) : filtered;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
-  const models = view === "inbox" ? await listVehicles(viewer) : [];
-  const contentWidth = view === "inbox" ? "mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-10" : "container-x";
 
   return (
     <main className="flex-1 bg-white">
       <Header viewer={viewer} />
 
-      {view === "inbox" ? (
-        <>
-          <RequirementModels vehicles={models} selected={code} />
-          <section className={`${contentWidth} py-5 sm:py-6`}>
-            <p className="eyebrow mb-2">{code} · Successor generation · {viewer.label}</p>
-            <h1 className="headline text-[28px] sm:text-[36px]">{vehicle.name}</h1>
-            {voices && <p className="mt-3 max-w-[820px] border-l-2 border-validate pl-3 text-[13px] text-ink-2"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
-          </section>
-        </>
-      ) : (
       <section className="relative isolate overflow-hidden bg-night text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/cars/${code}-wide.jpg`} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-60" />
@@ -83,10 +73,9 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
           )}
         </div>
       </section>
-      )}
 
       <nav className="sticky top-[72px] z-20 border-b border-line bg-white" aria-label="Views">
-        <div className={`${contentWidth} flex gap-8 overflow-x-auto`}>
+        <div className="container-x flex gap-8 overflow-x-auto">
           {VIEWS.map((v) => (
             <Link
               key={v.k}
@@ -105,7 +94,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         </div>
       </nav>
 
-      <div className={`${contentWidth} ${view === "inbox" ? "py-6 sm:py-8" : "py-8"}`}>
+      <div className="container-x py-8">
         {view === "inbox" && (
           <div className="mb-6">
             {/* Factor values, IDs and titles only: no customer text reaches this client component. */}
@@ -148,33 +137,39 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
     const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
-      <div className="flex min-w-0 flex-col gap-8">
+      <div className="flex flex-col">
         {active && (
-          <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
+          <p className="mb-4 border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
             <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
             <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
           </p>
         )}
-        <RequirementsBoard all={all} items={reqs} vehicle={code} filter={qFilter} search={search} selected={selectedId} />
-        <div id="decision-card" className="min-w-0 scroll-mt-[145px] border-t border-line pt-6">
+        <BoardToolbar all={all} vehicle={code} filter={qFilter} search={search} />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        {/* Desktop: the board stays in view beside the Decision Card, like an inbox. Phone: board, then card. */}
+        <div className="min-w-0 lg:sticky lg:top-[145px] lg:flex lg:h-[calc(100vh-170px)] lg:flex-col lg:self-start">
+          <RequirementsBoard items={reqs} vehicle={code} filter={qFilter} search={search} selected={selectedId} region={viewer.label} />
+        </div>
+        <div id="decision-card" className="min-w-0 scroll-mt-[145px]">
           {detail && <ScrollToCard targetId="decision-card" selected={detail.requirement.id} />}
           {detail ? (
             <>
-              <a href="#requirements-board" className="mb-5 inline-flex min-h-9 items-center text-[13px] font-medium text-blue hover:underline">← Back to requirements board</a>
-              <DecisionCard
-                r={detail.requirement}
-                quotes={detail.quotes}
-                hidden={detail.hidden}
-                events={events}
-                labels={labels}
-                thresholds={weights.thresholds}
-                viewer={viewer}
-                siblings={all}
-              />
+            <a href={`${requirementBoardHref(code, qFilter, search)}#requirements-board`} className="mb-4 inline-flex text-[13px] font-medium text-blue hover:underline lg:hidden">← Back to requirements board</a>
+            <DecisionCard
+              r={detail.requirement}
+              quotes={detail.quotes}
+              hidden={detail.hidden}
+              events={events}
+              labels={labels}
+              thresholds={weights.thresholds}
+              viewer={viewer}
+              siblings={all}
+            />
             </>
           ) : (
             <p className="text-ink-3">Select a requirement.</p>
           )}
+        </div>
         </div>
       </div>
     );
@@ -224,8 +219,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const [rep, conflicts, issues] = await Promise.all([representation(code), marketConflicts(code), dataIssues(code)]);
     const sev: Record<string, string> = { critical: "bg-danger text-white", warning: "bg-validate-soft text-validate", info: "bg-mist text-ink-2" };
     return (
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-1">
+            <HappinessMeterCard viewer={viewer} vehicle={code} />
+          </div>
+          <div className="grid gap-6 xl:col-span-2 xl:grid-cols-2">
+            <Section title="Missing voices" aside="Share of customer comments vs share of 2025 sales">
           <ul className="flex flex-col gap-4">
             {rep.map((r) => (
               <li key={r.market} className="text-[13px]">
@@ -236,23 +236,25 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             ))}
           </ul>
         </Section>
-        <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
-          {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
-            <table className="w-full text-[13px]">
-              <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
-              <tbody>
-                {conflicts.map((c) => (
-                  <tr key={c.attribute} className="border-t border-line">
-                    <td className="py-2">{c.attribute}</td>
-                    <td className="py-2 text-right tabular-nums">{c.cn}</td>
-                    <td className="py-2 text-right tabular-nums">{c.eu}</td>
-                    <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
+            <Section title="Market conflicts" aside="China vs Europe study, gap of 0.8 or more">
+              {conflicts.length === 0 ? <p className="text-[14px] text-ink-3">No conflicts above the threshold.</p> : (
+                <table className="w-full text-[13px]">
+                  <thead className="text-left text-ink-3"><tr><th className="py-1 font-medium">Attribute</th><th className="py-1 text-right font-medium">China</th><th className="py-1 text-right font-medium">Europe</th><th className="py-1 pl-3 font-medium">Scope</th></tr></thead>
+                  <tbody>
+                    {conflicts.map((c) => (
+                      <tr key={c.attribute} className="border-t border-line">
+                        <td className="py-2">{c.attribute}</td>
+                        <td className="py-2 text-right tabular-nums">{c.cn}</td>
+                        <td className="py-2 text-right tabular-nums">{c.eu}</td>
+                        <td className="py-2 pl-3">{c.in_scope ? <span className="text-act">In scope</span> : <span className="text-ink-3">{c.scope_reason}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          </div>
+        </div>
         <div className="xl:col-span-2">
           <Section title="Data issues found and how they were handled">
             <ul className="flex flex-col divide-y divide-line">
