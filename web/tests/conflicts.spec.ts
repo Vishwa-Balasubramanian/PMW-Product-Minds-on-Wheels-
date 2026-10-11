@@ -58,6 +58,8 @@ test('global or market-specific block shows survey means and records the scope d
     await expect(block).toContainText('CN/EU customer study 2025, means only, no sample sizes');
     await expect(block).toContainText('China has no customer comments');
     await expect(block.getByRole('button', { name: 'Approve as China-specific' })).toBeVisible();
+    // The general Approve is hidden: a conflict card can only be approved with a scope.
+    await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
 
     // No horizontal overflow at phone width.
     await page.setViewportSize({ width: 375, height: 812 });
