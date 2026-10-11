@@ -9,6 +9,18 @@ A small floating microphone at the bottom right of every page. Click it to talk 
 
 Without a key the app and tests still run; clicking the microphone shows a short configuration message.
 
+## Local mode (no OpenAI key)
+
+Adapted from the Minerva prototype. When the server has no `OPENAI_API_KEY`, the mic still works:
+
+1. The browser's speech recognition (Chrome, Edge) hears one command.
+2. `lib/voice/local.ts` routes it deterministically, with no model, to the same tools listed below, e.g. "open the 7 Series", "show conflicts", "explain the score", "read a customer quote", "challenge this", "approve this", "give me my briefing".
+3. The tool runs through `POST /api/voice/tools`, so it is region-filtered and audited exactly like the AI agent; decisions and Challenge still open the Confirm dialog.
+4. The reply is spoken by ElevenLabs through `POST /api/voice/speak` (the key stays on the server) or, without `ELEVENLABS_API_KEY`, by the browser voice.
+5. Hands-free: after replying, PMW listens again, unless a confirmation is waiting for a click. Say "stop" or click the mic to end.
+
+Privacy: Chrome sends recognised audio to Google; ElevenLabs receives only the sentence PMW speaks (which can include a customer quote it reads out).
+
 ## How it works
 
 - `POST /api/voice/session` (same-origin only) mints a short-lived OpenAI Realtime client secret. The agent's prompt, tools and turn detection are fixed there, server-side. The API key never reaches the browser.

@@ -6,7 +6,9 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return voiceJson({ error: "This request must come from PMW." }, 403);
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return voiceJson({ error: "Voice is not configured yet. Add OPENAI_API_KEY to the server environment." }, 503);
+  // Without OpenAI the browser falls back to the local mode (speech recognition + PMW's command router);
+  // tts says whether ElevenLabs speech is available for its replies.
+  if (!apiKey) return voiceJson({ error: "Voice is not configured yet. Add OPENAI_API_KEY to the server environment.", local: true, tts: Boolean(process.env.ELEVENLABS_API_KEY) }, 503);
   try {
     // Mint a short-lived client secret; the browser never sees the API key.
     const response = await fetch("https://api.openai.com/v1/realtime/client_secrets", {

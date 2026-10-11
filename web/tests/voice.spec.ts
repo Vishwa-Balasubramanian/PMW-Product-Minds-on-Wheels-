@@ -22,14 +22,37 @@ test.beforeEach(async ({ context }) => {
   await context.addCookies([{ name: "pmw_region", value: "ALL", url: base }]);
 });
 
-test("voice is idle by default; missing credentials give a short message and return to idle", async ({ page }) => {
+test("without an OpenAI key the mic runs the local voice mode: spoken commands navigate and are audited", async ({ page }) => {
+  // Fake browser speech: recognition hands back the phrase the test says; the browser voice finishes at once.
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    class FakeRecognition {
+      lang = ""; continuous = false; interimResults = false; maxAlternatives = 1;
+      onresult: ((e: unknown) => void) | null = null; onerror: unknown = null; onend: (() => void) | null = null; onspeechstart: unknown = null;
+      start() { w.__rec = this; w.__listening = true; }
+      abort() { w.__listening = false; }
+    }
+    w.SpeechRecognition = FakeRecognition;
+    w.webkitSpeechRecognition = FakeRecognition;
+    w.__say = (text: string) => { const r = w.__rec as FakeRecognition; w.__listening = false; r.onresult?.({ results: [[{ transcript: text }]] }); };
+    const synth = { speak: (u: { onend?: () => void }) => setTimeout(() => u.onend?.(), 10), cancel: () => {} };
+    Object.defineProperty(window, "speechSynthesis", { value: synth });
+    w.SpeechSynthesisUtterance = class { onend?: () => void; constructor(public text: string) {} };
+  });
   await page.goto("/vehicles/G70");
   const mic = page.getByRole("button", { name: "Start PMW voice" });
   await expect(mic).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".voice-agent").getByRole("alert")).toHaveCount(0);
   await mic.click();
-  await expect(page.locator(".voice-agent").getByRole("alert")).toContainText("Voice is not configured yet");
-  await expect(page.getByRole("button", { name: "Start PMW voice" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".voice-mic")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __listening?: boolean }).__listening)).toBe(true);
+  await page.evaluate(() => (window as unknown as { __say: (t: string) => void }).__say("open the 5 series"));
+  await expect(page).toHaveURL(/\/vehicles\/G60/);
+  const audit = read("SELECT rationale FROM audit_events WHERE entity_type='voice' AND action='voice: navigate' ORDER BY id DESC LIMIT 1");
+  expect(audit[0].rationale).toBe("open the 5 series");
+  // Hands-free: after replying, PMW listens again.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __listening?: boolean }).__listening)).toBe(true);
+  await page.locator(".voice-mic").click();
+  await expect(page.locator(".voice-mic")).toHaveAttribute("aria-pressed", "false");
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {

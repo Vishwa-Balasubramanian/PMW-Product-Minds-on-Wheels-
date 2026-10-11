@@ -48,7 +48,7 @@ async function connect() {
 const say = (text: string, role: "user" | "agent" = "user") => act(() => rt.callbacks!.onTranscript({ id: `${role}-1`, role, text, final: true }));
 
 it("does nothing until clicked, then shares page context and stops on a second click", async () => {
-  render(<><article data-requirement-id="R-G70-001" data-status="proposed" /><VoiceAgent region="US" /></>);
+  render(<><article data-requirement-id="R-G70-999" /><article data-open-requirement="R-G70-001" data-status="proposed" /><VoiceAgent region="US" /></>);
   expect(fetchMock).not.toHaveBeenCalled();
   expect(mic().getAttribute("aria-pressed")).toBe("false");
   fireEvent.click(mic());

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { agentFocus } from "@/lib/agentFocus";
 import { noVoiceData, VOICE_TOOLS, type ConfirmableAction, type VoiceConfirmation, type VoiceResult, type VoiceTool } from "@/lib/voice/config";
-import { RealtimeSession } from "@/lib/voice/realtime";
+import { LocalVoiceSession, localVoiceSupported } from "@/lib/voice/local";
+import { RealtimeSession, type RealtimeCallbacks } from "@/lib/voice/realtime";
 
 type Pending = VoiceConfirmation;
 type Phase = "idle" | "connecting" | "live";
@@ -118,7 +119,7 @@ export function VoiceAgent({ region }: { region: string }) {
   const [error, setError] = useState("");
   const [queue, setQueue] = useState<Pending[]>([]);
   const [progress, setProgress] = useState("");
-  const session = useRef<RealtimeSession | null>(null);
+  const session = useRef<RealtimeSession | LocalVoiceSession | null>(null);
   const spoken = useRef("");
   // True while proposals wait for clicks: voice can never confirm or add decisions meanwhile.
   const pendingRef = useRef(false);
@@ -134,13 +135,14 @@ export function VoiceAgent({ region }: { region: string }) {
     const params = new URLSearchParams(query);
     const model = pathname.split("/vehicles/")[1]?.split("/")[0] ?? null;
     const view = params.get("view") ?? (model ? "inbox" : "home");
-    const open = document.querySelector("[data-requirement-id]");
+    // The Decision Card that is open on screen (Requirements view or board drawer), not the first card in a list.
+    const open = document.querySelector("[data-open-requirement]");
     return JSON.stringify({
       page: pathname, view, region, model: model ?? params.get("vehicle") ?? "all",
       board_filters: view === "inbox" ? Object.fromEntries(["q", "search"].flatMap((k) => params.get(k) ? [[k, params.get(k)]] : [])) : undefined,
       // The requirement whose detail is on screen (board drawer or list selection).
       open_requirement: open ? {
-        id: open.getAttribute("data-requirement-id"),
+        id: open.getAttribute("data-open-requirement"),
         status: open.getAttribute("data-status"),
       } : null,
       heading: document.querySelector("h1")?.textContent?.trim().slice(0, 120) ?? null,
@@ -208,7 +210,7 @@ export function VoiceAgent({ region }: { region: string }) {
     setPhase("connecting");
     setError("");
     spoken.current = "";
-    const current = new RealtimeSession({
+    const callbacks: RealtimeCallbacks = {
       onLive: () => {
         setPhase("live");
         current.sendContext(`PMW page context (not evidence): ${pageContext()}`);
@@ -235,12 +237,25 @@ export function VoiceAgent({ region }: { region: string }) {
       // Transcripts are not displayed; the final user text is kept for the audit trail.
       onTranscript: ({ role, text, final }) => { if (role === "user" && final && text) spoken.current = text; },
       onToolCall: runTool,
-    });
+    };
+    // OpenAI Realtime when the server has a key; otherwise the local mode (browser recognition + PMW's command
+    // router, with ElevenLabs speech when configured).
+    const realtime = new RealtimeSession(callbacks);
+    let current: RealtimeSession | LocalVoiceSession = realtime;
     session.current = current;
     try {
-      const { clientSecret } = await post<{ clientSecret: string }>("/api/voice/session", {});
+      const response = await fetch("/api/voice/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const data = await response.json() as { clientSecret?: string; error?: string; local?: boolean; tts?: boolean };
       if (session.current !== current) return;
-      await current.start(clientSecret);
+      if (response.ok && data.clientSecret) {
+        await realtime.start(data.clientSecret);
+      } else if (data.local && localVoiceSupported()) {
+        current = new LocalVoiceSession(callbacks, Boolean(data.tts));
+        session.current = current;
+        await current.start();
+      } else {
+        throw new Error(data.error ?? "Could not start voice.");
+      }
     } catch (e) {
       showError(e instanceof Error ? e.message : "Could not start voice.");
       current.stop();

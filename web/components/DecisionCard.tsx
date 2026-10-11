@@ -78,7 +78,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
   const approval = r.status === "approved" ? events.find((e) => e.field === "status" && e.after === "approved") : undefined;
 
   return (
-    <article className="flex flex-col gap-6">
+    <article className="flex flex-col gap-6" data-open-requirement={r.id} data-status={r.status}>
       <header className="flex flex-col gap-5">
         {/* Photo of the part this requirement is about, cropped to its focal point. */}
         <div className="relative isolate flex min-h-[280px] flex-col justify-end gap-3 overflow-hidden bg-night p-6 text-white sm:p-8">
