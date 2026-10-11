@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { Header } from "@/components/Header";
 import { ScrollToCard } from "@/components/ScrollToCard";
+import { RequirementModels } from "@/components/RequirementModels";
+import { RequirementsBoard } from "@/components/RequirementsBoard";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { MOSCOW, Matrix, QuadrantBadge, QuickWinBadge, Section, StatusBadge } from "@/components/ui";
+import { Matrix, QuadrantBadge, Section } from "@/components/ui";
 import {
-  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals,
+  auditFor, dataIssues, getActiveWeights, getFactorLabels, getRequirement, getVehicle, getViewer, getWeights, listRequirements, listSignals, listVehicles,
   marketConflicts, missingVoices, representation, storedOrder, vehicleTotals,
 } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
@@ -39,14 +41,28 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     storedOrder(code),
   ]);
   const quickWins = all.filter((r) => r.kind === "quick_win");
-  const reqs = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const search = view === "inbox" && typeof sp.search === "string" ? sp.search.trim().slice(0, 256) : "";
+  const filtered = qFilter === "quick" ? quickWins : qFilter ? all.filter((r) => r.quadrant === qFilter) : all;
+  const reqs = search ? filtered.filter((r) => r.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) : filtered;
   const selectedId = typeof sp.req === "string" && reqs.some((r) => r.id === sp.req) ? sp.req : reqs[0]?.id;
   const awaiting = all.filter((r) => r.status === "proposed" || r.status === "edited").length;
+  const models = view === "inbox" ? await listVehicles(viewer) : [];
+  const contentWidth = view === "inbox" ? "mx-auto w-full max-w-[1600px] px-4 sm:px-8 lg:px-10" : "container-x";
 
   return (
     <main className="flex-1 bg-white">
       <Header viewer={viewer} />
 
+      {view === "inbox" ? (
+        <>
+          <RequirementModels vehicles={models} selected={code} />
+          <section className={`${contentWidth} py-5 sm:py-6`}>
+            <p className="eyebrow mb-2">{code} · Successor generation · {viewer.label}</p>
+            <h1 className="headline text-[28px] sm:text-[36px]">{vehicle.name}</h1>
+            {voices && <p className="mt-3 max-w-[820px] border-l-2 border-validate pl-3 text-[13px] text-ink-2"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
+          </section>
+        </>
+      ) : (
       <section className="relative isolate overflow-hidden bg-night text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/cars/${code}-wide.jpg`} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-60" />
@@ -67,9 +83,10 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
           )}
         </div>
       </section>
+      )}
 
       <nav className="sticky top-[72px] z-20 border-b border-line bg-white" aria-label="Views">
-        <div className="container-x flex gap-8 overflow-x-auto">
+        <div className={`${contentWidth} flex gap-8 overflow-x-auto`}>
           {VIEWS.map((v) => (
             <Link
               key={v.k}
@@ -88,7 +105,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
         </div>
       </nav>
 
-      <div className="container-x py-8">
+      <div className={`${contentWidth} ${view === "inbox" ? "py-6 sm:py-8" : "py-8"}`}>
         {view === "inbox" && (
           <div className="mb-6">
             {/* Factor values, IDs and titles only: no customer text reaches this client component. */}
@@ -131,93 +148,30 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
     const detail = selectedId ? await getRequirement(viewer, selectedId) : undefined;
     const events = detail ? await auditFor(viewer, detail.requirement.id) : [];
     return (
-      <div className="grid gap-8 lg:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-3 lg:sticky lg:top-[140px] lg:max-h-[calc(100vh-170px)] lg:self-start">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter requirements">
-            {([null, "act", "validate", "monitor", "park"] as const).map((q) => (
-              <Link
-                key={q ?? "all"}
-                href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
-                scroll={false}
-                className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === q ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink"}`}
-              >
-                {q ? QUADRANT[q].label : "All"} <span className="tabular-nums opacity-70">{q ? all.filter((r) => r.quadrant === q).length : all.length}</span>
-              </Link>
-            ))}
-            <Link
-              href={`/vehicles/${code}?q=quick`}
-              scroll={false}
-              title="Customers ask for equipment BMW already sells"
-              className={`h-8 border px-2.5 text-[13px] leading-8 ${qFilter === "quick" ? "border-blue bg-blue text-white" : "border-blue text-blue hover:bg-monitor-soft"}`}
-            >
-              Quick wins <span className="tabular-nums opacity-70">{quickWins.length}</span>
-            </Link>
-          </div>
-          {active && (
-            <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
-              <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
-              <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
-            </p>
-          )}
-          <div className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
-            <h2 className="whitespace-nowrap text-[15px] font-semibold">Ranked by priority</h2>
-            <span className="text-[12px] text-ink-3">MoSCoW, highest first</span>
-          </div>
-          <div className="flex flex-col overflow-y-auto">
-            {reqs.length === 0 && <p className="py-6 text-[14px] text-ink-3">No {qFilter === "quick" ? "quick wins" : "requirements"} with evidence in {viewer.label}.</p>}
-            {MOSCOW.map((m, gi) => {
-              const next = MOSCOW[gi - 1]?.min ?? 101;
-              const rows = reqs.filter((r) => r.priority >= m.min && r.priority < next);
-              if (!rows.length) return null;
-              return (
-                <section key={m.key} aria-label={m.label} className="border-b border-line pb-2">
-                  <div className="flex items-baseline justify-between gap-2 px-3 pt-4 pb-1">
-                    <h3 className={`text-[12px] font-bold uppercase tracking-[0.1em] ${m.text}`}>{m.label}</h3>
-                    <span className="text-[12px] text-ink-3">{rows.length} · {m.hint}</span>
-                  </div>
-                  <ul>
-                    {rows.map((r) => {
-                      const on = r.id === selectedId;
-                      return (
-                        <li key={r.id}>
-                          <Link
-                            href={`/vehicles/${code}?${qFilter ? `q=${qFilter}&` : ""}req=${r.id}`}
-                            scroll={false}
-                            aria-label={`${m.label}, priority ${r.priority}: ${r.title}`}
-                            className={`relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 py-2.5 pr-3 pl-7 ${on ? "bg-monitor-soft shadow-[inset_3px_0_0_var(--color-blue)]" : "hover:bg-mist"}`}
-                          >
-                            <span className={`absolute left-3 top-[17px] h-[5px] w-[5px] ${m.dot}`} aria-hidden="true" />
-                            <span className="text-[15px] font-normal leading-snug text-ink">{r.title}</span>
-                            <span className="row-span-2 self-center text-[16px] font-semibold tabular-nums">{r.priority}</span>
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
-                              {r.aspect && <span>{r.aspect} · {r.part}</span>}
-                              <QuadrantBadge q={r.quadrant} />
-                              {r.kind === "quick_win" && <QuickWinBadge />}
-                              {r.status !== "proposed" && <StatusBadge s={r.status} />}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        </aside>
-        <div id="decision-card" className="min-w-0 scroll-mt-[145px]">
+      <div className="flex min-w-0 flex-col gap-8">
+        {active && (
+          <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2" data-testid="ranking-note">
+            <b className="uppercase tracking-[0.05em] text-ink">Ranking: {presetLabel(active.preset)}</b> · changed by {active.changed_by} at{" "}
+            <time dateTime={active.changed_at}>{new Date(active.changed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</time>
+          </p>
+        )}
+        <RequirementsBoard all={all} items={reqs} vehicle={code} filter={qFilter} search={search} selected={selectedId} />
+        <div id="decision-card" className="min-w-0 scroll-mt-[145px] border-t border-line pt-6">
           {detail && <ScrollToCard targetId="decision-card" selected={detail.requirement.id} />}
           {detail ? (
-            <DecisionCard
-              r={detail.requirement}
-              quotes={detail.quotes}
-              hidden={detail.hidden}
-              events={events}
-              labels={labels}
-              thresholds={weights.thresholds}
-              viewer={viewer}
-              siblings={all}
-            />
+            <>
+              <a href="#requirements-board" className="mb-5 inline-flex min-h-9 items-center text-[13px] font-medium text-blue hover:underline">← Back to requirements board</a>
+              <DecisionCard
+                r={detail.requirement}
+                quotes={detail.quotes}
+                hidden={detail.hidden}
+                events={events}
+                labels={labels}
+                thresholds={weights.thresholds}
+                viewer={viewer}
+                siblings={all}
+              />
+            </>
           ) : (
             <p className="text-ink-3">Select a requirement.</p>
           )}

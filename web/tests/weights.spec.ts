@@ -8,9 +8,8 @@ const base = 'http://127.0.0.1:3107';
 
 /** The ranked list as "priority: title" in display order. */
 async function ranked(page: Page): Promise<string[]> {
-  const labels = await page.locator('aside section[aria-label] a[aria-label]').evaluateAll(
-    (as) => as.map((a) => a.getAttribute('aria-label') ?? ''));
-  return labels.map((l) => l.replace(/^.*?, priority /, ''));
+  return page.getByTestId('requirement-card').evaluateAll(
+    (as) => as.map((a) => `${a.getAttribute('data-priority')}: ${a.querySelector('[data-card-title]')?.textContent ?? ''}`));
 }
 
 test('priority weights re-rank the 7 Series, are audited, persist and reset exactly', async ({ page, context }) => {
