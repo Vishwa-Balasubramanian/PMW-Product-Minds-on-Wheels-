@@ -1,0 +1,1 @@
+test the vouce feature. check how fast is it responsing. if it is not fast enough turn on the cinversational AI features in it
