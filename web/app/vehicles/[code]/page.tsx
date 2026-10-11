@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BoardWorkspace } from "@/components/BoardWorkspace";
 import { DecisionCard } from "@/components/DecisionCard";
 import { HappinessMeterCard } from "@/components/HappinessMeterCard";
-import { Header } from "@/components/Header";
 import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
 import { ScrollToCard } from "@/components/ScrollToCard";
 import { WeightsPanel } from "@/components/WeightsPanel";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 const VIEWS = [
   { k: "inbox", label: "Requirements" },
+  { k: "decisions", label: "Decisions" },
   { k: "matrix", label: "Decision matrix" },
   { k: "signals", label: "Signals" },
   { k: "data", label: "Data health" },
@@ -51,7 +52,6 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
 
   return (
     <main className="flex-1 bg-white">
-      <Header viewer={viewer} />
 
       <section className="relative isolate overflow-hidden bg-night text-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -80,6 +80,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             <Link
               key={v.k}
               href={`/vehicles/${code}?view=${v.k}`}
+              aria-current={view === v.k ? "page" : undefined}
               className={`whitespace-nowrap border-b-2 py-4 text-[13px] font-bold uppercase tracking-[0.05em] ${view === v.k ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink"}`}
             >
               {v.label}
@@ -127,6 +128,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             </div>
           </div>
         )}
+        {view === "decisions" && <BoardWorkspace sp={sp} viewer={viewer} basePath={`/vehicles/${code}`} fixedVehicle={code} heading="h2" />}
         {view === "signals" && <Signals />}
         {view === "data" && <DataHealth />}
       </div>

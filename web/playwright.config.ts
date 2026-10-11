@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: '**/unit/**',
   workers: 1,
   fullyParallel: false,
   timeout: 30_000,
@@ -10,6 +11,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:3107',
     channel: process.env.PW_CHANNEL || undefined,
     headless: true,
+    viewport: { width: 1440, height: 900 },
     trace: 'retain-on-failure',
   },
   webServer: {
@@ -17,6 +19,7 @@ export default defineConfig({
     url: 'http://127.0.0.1:3107',
     reuseExistingServer: false,
     env: { PMW_DB: path.resolve('..', 'db', 'pmw-smoke-run.sqlite'),
-      VERCEL: '', PMW_USE_REMOTE: '0', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '' },
+      VERCEL: '', PMW_USE_REMOTE: '0', TURSO_DATABASE_URL: '', TURSO_AUTH_TOKEN: '',
+      OPENAI_API_KEY: '', ELEVENLABS_API_KEY: '', ELEVENLABS_AGENT_ID: '' },
   },
 });

@@ -71,6 +71,7 @@ test('global or market-specific block shows survey means and records the scope d
     await block.getByRole('button', { name: 'Approve as global requirement' }).click();
     await expect(page.getByTestId('conflict-decision')).toContainText('Approved as global requirement');
     await expect(block.getByRole('button', { name: /^Approve as/ })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
     const audit = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Audit trail', exact: true }) });
     await expect(audit.getByText('“Scope decision: global requirement.”')).toBeVisible();
     await page.screenshot({ path: 'test-results/conflict-block-desktop.png', fullPage: true });

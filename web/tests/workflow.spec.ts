@@ -54,6 +54,7 @@ test('equipment quick win displays only its matching wishing comments', async ({
     await expect(page.getByText(/Make ventilated front seats available on the successor/)).toBeVisible();
     expect(r.title).toContain('7VB');
     await expect(page.locator('article img').first()).toHaveAttribute('alt', 'Seats');
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
     const evidence = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Customer evidence', exact: true }) });
     const shownIds = await evidence.locator('li .font-mono').allTextContents();
     expect(shownIds.sort()).toEqual(ids);

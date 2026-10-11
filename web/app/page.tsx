@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
 import { getViewer, listVehicles } from "@/lib/gate";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +20,6 @@ export default async function Home() {
 
   return (
     <main className="flex-1">
-      <Header viewer={viewer} />
       <section className="relative h-[max(620px,min(92vh,960px))] bg-night text-white">
         
         <div className="grid h-full grid-cols-1 md:grid-cols-3">

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
 import { AuditTimeline } from "@/components/ui";
 import { auditLog, getViewer } from "@/lib/gate";
 
@@ -22,7 +21,6 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
 
   return (
     <main className="flex-1">
-      <Header viewer={viewer} />
       <div className="container-x py-12">
         <h1 className="headline text-[36px]">Audit trail</h1>
         <p className="mt-3 max-w-[680px] text-[16px] text-ink-2">

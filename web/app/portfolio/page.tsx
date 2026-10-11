@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
-import { getViewer, portfolio } from "@/lib/gate";
+import { portfolio } from "@/lib/gate";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +10,9 @@ const heatColor = (share: number) => {
 };
 
 export default async function PortfolioPage() {
-  const [viewer, data] = await Promise.all([getViewer(), portfolio()]);
+  const data = await portfolio();
   return (
-    <main className="flex-1 bg-white">
-    <Header viewer={viewer} />
-    <div className="container-x py-10">
+    <main className="flex-1 bg-white"><div className="container-x py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="eyebrow">Cross-program intelligence</p><h1 className="headline mt-2 text-[36px]">Cross-Model Radar</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink-2">Find customer issues that repeat across the 1, 5 and 7 Series.</p></div>
@@ -50,7 +47,6 @@ export default async function PortfolioPage() {
         {!data.themes.length && <p className="p-5 text-sm text-ink-2">No customer themes are available in this dataset yet.</p>}
       </section>
       <p className="mt-4 text-xs leading-relaxed text-ink-3">All markets · Aggregate counts only · Identical for every viewer region. Open a vehicle to review evidence permitted for your region. A comment can belong to several themes; theme counts must not be added together.</p>
-    </div>
-    </main>
+    </div></main>
   );
 }
