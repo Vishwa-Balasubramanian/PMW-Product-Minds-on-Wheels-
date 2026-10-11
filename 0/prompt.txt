@@ -1,0 +1,1 @@
+Since this is a small hackathon, can we do it with SQLite itself? waht do you think
