@@ -91,5 +91,6 @@ test('portfolio scrolls inside its table at 375px and every vehicle link opens s
     await page.goto('/portfolio');
   }
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(page.getByRole('dialog').getByRole('link', { name: 'Cross-Model Radar', exact: true })).toHaveAttribute('aria-current', 'page');
+  // The phone menu drops down from the top bar and marks the current page.
+  await expect(page.locator('#mobile-menu').getByRole('link', { name: 'Radar', exact: true })).toHaveAttribute('aria-current', 'page');
 });

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
-import { Sidebar } from "@/components/Sidebar";
 import { VoiceAgent } from "@/components/VoiceAgent";
 import { getViewer } from "@/lib/gate";
 import "./globals.css";
@@ -24,10 +23,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col">
         <Header viewer={viewer} />
-        <div className="flex flex-1">
-          <Sidebar />
-          <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-        </div>
+        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
         <VoiceAgent key={viewer.region} region={viewer.region} />
       </body>
     </html>

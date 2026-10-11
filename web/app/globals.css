@@ -301,8 +301,8 @@ b, strong { font-weight: 700; }
 .board-kpis > div + div { border-top: 0; border-left: 1px solid var(--color-line); }
 .board-cards { max-height: min(70vh, 720px); padding-bottom: 8px; }
 @media (max-width: 1023px) { .board-kpis > div:nth-child(3) { border-left: 0; } .board-kpis > div:nth-child(n+3) { border-top: 1px solid var(--color-line); } }
-/* Drawer sits below our 72px header and beside the 220px sidebar (phones: full width). */
-.drawer-root { inset: 72px 0 0 220px; z-index: 55; } /* above the board, its filters and the header; below the voice mic */
+/* Drawer sits below the 72px top bar. */
+.drawer-root { inset: 72px 0 0 0; z-index: 55; } /* below the 72px top bar; above the board and its filters; below the voice mic */
 @media (max-width: 1023px) { .drawer-root { inset: 72px 0 0 0; } }
 /* Board card flags and AI-recommendation colours (from feature_v, missed in the first port). */
 .rec-act { color: var(--color-act); }
