@@ -39,8 +39,18 @@ export async function POST(request: Request) {
           audio: {
             input: {
               transcription: { model: "gpt-4o-mini-transcribe" },
-              noise_reduction: { type: "near_field" },
-              turn_detection: { type: "server_vad", silence_duration_ms: 450, interrupt_response: true, create_response: true },
+              // Laptop microphone in a noisy room: far-field noise reduction (use near_field with a headset).
+              noise_reduction: { type: process.env.OPENAI_NOISE_REDUCTION === "near_field" ? "near_field" : "far_field" },
+              // Background talk must not cut PMW off: a higher threshold needs clear, close speech, and speech while PMW
+              // is talking does not interrupt it (click the mic to stop). OPENAI_VOICE_INTERRUPT=1 re-enables barge-in.
+              turn_detection: {
+                type: "server_vad",
+                threshold: Math.min(0.95, Math.max(0.3, Number(process.env.OPENAI_VAD_THRESHOLD) || 0.75)),
+                prefix_padding_ms: 300,
+                silence_duration_ms: 600,
+                interrupt_response: process.env.OPENAI_VOICE_INTERRUPT === "1",
+                create_response: true,
+              },
             },
             // Slightly brisker delivery for live demos.
             output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin", speed: 1.1 },
