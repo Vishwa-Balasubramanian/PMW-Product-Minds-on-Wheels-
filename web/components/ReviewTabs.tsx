@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 
 const TABS = ["Overview", "Evidence", "Scoring", "Activity"] as const;
 
 /** Only presentation state lives here; evidence is filtered and rendered on the server. */
 export function ReviewTabs({ overview, evidence, scoring, activity }: Record<Lowercase<typeof TABS[number]>, ReactNode>) {
-  const [active, setActive] = useState(0);
+  const search = useSearchParams();
+  const requested = TABS.findIndex((tab) => tab.toLowerCase() === search.get("tab"));
+  const [selection, setSelection] = useState({ query: search.toString(), active: Math.max(0, requested) });
+  const active = selection.query === search.toString() ? selection.active : Math.max(0, requested);
+  const setActive = (next: number) => setSelection({ query: search.toString(), active: next });
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const pendingQuote = useRef<string | null>(null);

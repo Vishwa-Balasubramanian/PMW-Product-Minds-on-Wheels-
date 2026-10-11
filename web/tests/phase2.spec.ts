@@ -54,7 +54,7 @@ test('portfolio cells match signals and stay identical in every region without r
     await context.addCookies([{ name: 'pmw_region', value: region, url: 'http://127.0.0.1:3107' }]);
     const response = await page.goto('/portfolio');
     expect(response?.ok()).toBeTruthy();
-    await expect(page.getByRole('heading', { name: 'Portfolio signals', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Cross-Model Radar', exact: true })).toBeVisible();
     const table = page.getByTestId('portfolio-heatmap');
     const content = await table.innerText();
     if (baseline) expect(content).toBe(baseline);
@@ -91,5 +91,5 @@ test('portfolio scrolls inside its table at 375px and every vehicle link opens s
     await page.goto('/portfolio');
   }
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(page.getByRole('dialog').getByRole('link', { name: 'Portfolio signals', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Cross-Model Radar', exact: true })).toHaveAttribute('aria-current', 'page');
 });

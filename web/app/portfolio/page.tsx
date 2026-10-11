@@ -14,7 +14,7 @@ export default async function PortfolioPage() {
   return (
     <div className="page-content">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="eyebrow text-blue">Cross-program intelligence</p><h1 className="mt-2 text-2xl font-semibold tracking-tight">Portfolio signals</h1>
+        <div><p className="eyebrow text-blue">Cross-program intelligence</p><h1 className="mt-2 text-2xl font-semibold tracking-tight">Cross-Model Radar</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink-2">Find customer issues that repeat across the 1, 5 and 7 Series.</p></div>
         <Link href="/" className="text-xs font-medium text-blue hover:underline">Back to portfolio overview →</Link>
       </div>

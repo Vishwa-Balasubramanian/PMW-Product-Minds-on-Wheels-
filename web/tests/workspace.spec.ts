@@ -18,23 +18,24 @@ async function expectNoOverflow(page: import('@playwright/test').Page) {
 
 test('portfolio shows real program totals and regional availability', async ({ page, context }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Portfolio overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Product Requirements Board', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Portfolio', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: /Open requirements for/ })).toHaveCount(3);
+  await expect(page.locator('.board-kpis > div')).toHaveCount(4);
+  await expect(page.locator('.board-column')).toHaveCount(5);
   await expectNoOverflow(page);
   await page.screenshot({ path: 'test-results/workspace-portfolio-desktop.png' });
   await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
-  await page.reload();
-  const f70 = page.locator('article').filter({ has: page.getByRole('heading', { name: 'BMW 1 Series', exact: true }) });
-  await expect(f70.getByText('Not available in your region', { exact: true })).toBeVisible();
-  await expect(f70.getByRole('link')).toHaveCount(0);
+  await page.goto('/?vehicle=F70');
+  await expect(page.getByLabel('Vehicle').locator('option', { hasText: 'BMW 1 Series' })).toHaveText(/not sold in United States/);
+  await expect(page.getByText('BMW 1 Series is not sold in United States', { exact: false })).toBeVisible();
+  await expect(page.locator('.board-card')).toHaveCount(0);
   await context.addCookies([{ name: 'pmw_region', value: 'CN', url: 'http://127.0.0.1:3107' }]);
-  await page.reload();
+  await page.goto('/?vehicle=G70');
   await expect(page.getByText('Thin evidence.', { exact: true }).first()).toBeVisible();
 });
 
 test('review tabs retain all evidence, scoring and history with keyboard access', async ({ page }) => {
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await expect(page.getByRole('heading', { name: 'From customer voice to requirement' })).toBeVisible();
   await expect(page.getByText(/Working hypothesis:/)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Customer evidence', exact: true })).not.toBeVisible();
@@ -56,7 +57,7 @@ test('review tabs retain all evidence, scoring and history with keyboard access'
 });
 
 test('desktop list and review scroll independently and preserve selection history', async ({ page }) => {
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   const rows = page.locator('.requirement-rows');
   await rows.evaluate(el => { el.scrollTop = 500; });
   const previousScroll = await rows.evaluate(el => el.scrollTop);
@@ -122,7 +123,7 @@ test('all small-screen views and review tabs stay within the workspace', async (
     await page.goto(route);
     await expectNoOverflow(page);
   }
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await page.locator('.requirement-row').first().click();
   for (const tab of ['Overview', 'Evidence', 'Scoring', 'Activity']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
@@ -134,7 +135,7 @@ test('all small-screen views and review tabs stay within the workspace', async (
 
 test('incoming workflow and weight controls fit the mobile workspace', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await page.getByRole('button', { name: /Priority weights/ }).click();
   await expect(page.getByRole('slider')).toHaveCount(5);
   await page.getByRole('button', { name: 'Customer first', exact: true }).click();
@@ -144,8 +145,7 @@ test('incoming workflow and weight controls fit the mobile workspace', async ({ 
   expect(await page.locator('.workspace-weights').evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   await expect(page.locator('.requirement-row').first()).toBeInViewport();
   await page.screenshot({ path: 'test-results/main-merge-weights-mobile.png' });
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Workspace navigation' }).getByRole('link', { name: 'Workflow', exact: true }).click();
+  await page.goto('/workflow'); // Hidden from the navigation; still reachable by URL.
   await expect(page.getByRole('heading', { name: 'From customer voice to a decision a product manager can defend.' })).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
   await expect(page.getByRole('button', { name: /Your region/ })).toHaveCount(1);

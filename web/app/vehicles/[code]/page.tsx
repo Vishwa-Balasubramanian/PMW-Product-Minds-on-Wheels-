@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BoardWorkspace } from "@/components/BoardWorkspace";
 import { DecisionCard } from "@/components/DecisionCard";
 import { EvidenceMeter } from "@/components/EvidenceMeter";
 import { WeightsPanel } from "@/components/WeightsPanel";
@@ -15,6 +16,7 @@ import { QUADRANT, type Quadrant } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const VIEWS = [
+  { k: "board", label: "Board" },
   { k: "inbox", label: "Requirements" },
   { k: "matrix", label: "Decision matrix" },
   { k: "signals", label: "Signals" },
@@ -29,7 +31,8 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
   const vehicle = await getVehicle(code);
   if (!vehicle) notFound();
   const viewer = await getViewer();
-  const view = VIEWS.find((v) => v.k === sp.view)?.k ?? "inbox";
+  // Board is the default; existing list links (?req= selection, ?q= quadrant filter) keep opening the two-pane list.
+  const view = VIEWS.find((v) => v.k === sp.view)?.k ?? (typeof sp.req === "string" || typeof sp.q === "string" ? "inbox" : "board");
   const qFilter = sp.q === "quick" ? "quick" : typeof sp.q === "string" && Object.hasOwn(QUADRANT, sp.q) ? (sp.q as Quadrant) : null;
 
   const [all, weights, voices, totals, labels, active, stored] = await Promise.all([
@@ -63,12 +66,13 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
           <div><dd>{totals.comments.toLocaleString("en-US")}</dd><dt>comments analysed (all markets)</dt></div>
           <div className="viewer-metric"><dt>Viewing as</dt><dd>{viewer.actor}</dd></div>
         </dl>
-        {voices && <p className="evidence-notice"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
+        {voices && <p id="missing-voices" className="evidence-notice"><b>Missing voices.</b> {voices} Confidence is lowered accordingly.</p>}
       </section>
       <nav className="workspace-views" aria-label="Views">
         {VIEWS.map((v) => <Link key={v.k} href={`/vehicles/${code}?view=${v.k}`} aria-current={view === v.k ? "page" : undefined}>{v.label}</Link>)}
       </nav>
-      <div className={`vehicle-body ${view === "inbox" ? "is-inbox" : ""}`}>
+      <div className={`vehicle-body ${view === "inbox" ? "is-inbox" : view === "board" ? "is-board" : ""}`}>
+        {view === "board" && <BoardWorkspace sp={sp} viewer={viewer} basePath={`/vehicles/${code}`} fixedVehicle={code} heading="h2" />}
         {view === "inbox" && (
           <div className="workspace-weights">
             <WeightsPanel
@@ -117,7 +121,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
               {[null, "act", "validate", "monitor", "park"].map((q) => (
                 <Link
                   key={q ?? "all"}
-                  href={`/vehicles/${code}${q ? `?q=${q}` : ""}`}
+                  href={`/vehicles/${code}?${q ? `q=${q}` : "view=inbox"}`}
                   className="filter-chip"
                   aria-current={qFilter === q ? "true" : undefined}
                   scroll={false}
@@ -185,7 +189,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
           </div>
         </aside>
         <div className="requirement-detail" key={selectedId}>
-          <Link href={`/vehicles/${code}${qFilter ? `?q=${qFilter}` : ""}`} className="back-to-list" scroll={false}>← Back to requirements</Link>
+          <Link href={`/vehicles/${code}?${qFilter ? `q=${qFilter}` : "view=inbox"}`} className="back-to-list" scroll={false}>← Back to requirements</Link>
           {detail ? (<>
             <EvidenceMeter mix={detail.requirement.evidence_mix} region={viewer.label} />
             <DecisionCard

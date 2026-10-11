@@ -28,7 +28,7 @@ export function Header({ viewer }: { viewer: Viewer }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const vehicle = VEHICLES.find((v) => pathname === `/vehicles/${v.code}`);
-  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : pathname === "/workflow" ? "Workflow" : pathname === "/portfolio" ? "Portfolio signals" : "Portfolio";
+  const title = vehicle ? `BMW ${vehicle.label}` : pathname === "/audit" ? "Audit trail" : pathname === "/workflow" ? "Workflow" : pathname === "/portfolio" ? "Cross-Model Radar" : "Portfolio";
 
   function navigation(mobile = false) {
     return (
@@ -40,15 +40,10 @@ export function Header({ viewer }: { viewer: Viewer }) {
         <nav aria-label={mobile ? "Mobile navigation" : "Main"} className="workspace-nav">
           <p className="nav-label">Workspace</p>
           <Link href="/" className="nav-item" aria-current={pathname === "/" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Portfolio</Link>
-          <Link href="/portfolio" className="nav-item" aria-current={pathname === "/portfolio" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Portfolio signals</Link>
-          <p className="nav-label mt-7">Vehicle programs</p>
-          {VEHICLES.map((v) => (
-            <Link key={v.code} href={`/vehicles/${v.code}`} className="nav-item" aria-current={vehicle?.code === v.code ? "page" : undefined} onClick={() => drawer.current?.close()}>
-              <NavIcon kind="vehicle" /><span>{v.label}</span><span className="ml-auto font-mono text-[11px] opacity-65">{v.code}</span>
-            </Link>
-          ))}
+          <Link href="/portfolio" className="nav-item" aria-current={pathname === "/portfolio" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Cross-Model Radar</Link>
+          {/* Vehicle pages stay reachable by URL, the Cross-Model Radar and voice; hidden from the navigation. */}
           <p className="nav-label mt-7">Governance</p>
-          <Link href="/workflow" className="nav-item" aria-current={pathname === "/workflow" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="portfolio" />Workflow</Link>
+          {/* /workflow stays reachable by URL (backup for Q&A) but is hidden from the navigation. */}
           <Link href="/audit" className="nav-item" aria-current={pathname === "/audit" ? "page" : undefined} onClick={() => drawer.current?.close()}><NavIcon kind="audit" />Audit trail</Link>
         </nav>
         <div className="sidebar-footer"><BrandLogo /><span className="mb-2 block font-medium text-ink-2">Evidence → decisions</span>for BMW Group<br />Hackathon prototype</div>

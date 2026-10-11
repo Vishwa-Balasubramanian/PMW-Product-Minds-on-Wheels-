@@ -112,7 +112,7 @@ test('G70 displays a complete offline requirement ladder', async ({ page, contex
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await expect(page.getByRole('heading', { name: 'BMW 7 Series', exact: true })).toBeVisible();
   await expect(page.getByText('Evidence-based draft · needs validation', { exact: false })).toBeVisible();
   await expect(page.getByText(/Working hypothesis:/)).toBeVisible();
@@ -213,7 +213,7 @@ test('switching requirements discards the previous unsaved edit', async ({ page,
 
 test('decision controls recover from a failed request and prevent duplicate submissions', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'ALL', url: 'http://127.0.0.1:3107' }]);
-  await page.goto('/vehicles/G60');
+  await page.goto('/vehicles/G60?view=inbox');
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
@@ -296,7 +296,7 @@ test('region restrictions and required reasons protect decision writes', async (
 test('region picker reports failure and can retry successfully on mobile', async ({ page, context }) => {
   await context.addCookies([{ name: 'pmw_region', value: 'US', url: 'http://127.0.0.1:3107' }]);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/vehicles/G70');
+  await page.goto('/vehicles/G70?view=inbox');
   await page.locator('.requirement-row').first().click();
   await page.getByRole('button', { name: /Your region/ }).click();
   await page.getByRole('radio', { name: /^China/ }).check();
@@ -338,8 +338,9 @@ test('home, assets, unknown routes and mismatched selections behave consistently
   const con = db();
   try {
     await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Product Requirements Board', exact: true })).toBeVisible();
     for (const name of ['BMW 1 Series', 'BMW 5 Series', 'BMW 7 Series']) {
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      await expect(page.getByLabel('Vehicle').locator('option', { hasText: name })).toHaveCount(1);
     }
     const photos = con.prepare('SELECT DISTINCT photo FROM requirements WHERE photo IS NOT NULL').all();
     for (const { photo } of photos) {

@@ -125,6 +125,8 @@ Live-model caches are not included in the offline-first deliverable.
 
 Implementation, checks and limitations: [Vishwa pipeline handoff](docs/VISHWA_IMPLEMENTATION.md).
 
+Optional voice agent (OpenAI Realtime): [setup, tools and safety](docs/VOICE_COPILOT.md). Set the server-side `OPENAI_API_KEY` in `web/.env.local`, then click the small microphone at the bottom of any page to talk to PMW in English or German.
+
 ## Repo map
 
 ```

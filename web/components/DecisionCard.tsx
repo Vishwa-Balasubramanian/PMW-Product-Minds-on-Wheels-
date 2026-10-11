@@ -1,3 +1,4 @@
+import { isRepresentationIssue, recommendationReason } from "@/lib/board";
 import type { Viewer } from "@/lib/gate";
 import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
@@ -71,9 +72,10 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
   const contradicts = quotes.filter((q) => q.role === "contradicts");
   const hiddenTotal = Object.values(hidden).reduce((a, b) => a + b, 0);
   const originalConfidence = events.find((e) => e.field === "confidence")?.before;
+  const representation = r.challenge.issues.map((i) => i.text).filter(isRepresentationIssue);
 
   return (
-    <article className="decision-card" aria-label="Requirement review">
+    <article className="decision-card" aria-label="Requirement review" data-requirement-id={r.id} data-status={r.status}>
       <header className="decision-header">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-3">
           <span className="font-mono">{r.id}</span><span>Rank {siblings.findIndex((x) => x.id === r.id) + 1} of {siblings.length}</span>
@@ -89,6 +91,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2"><MoscowBadge p={r.priority} /><QuadrantBadge q={r.quadrant} /><StatusBadge s={r.status} /><span className="ml-auto text-[11px] text-ink-2 tabular-nums">Priority <b>{r.priority}</b> <span className="mx-1 text-line">/</span> Confidence <b>{r.confidence}</b></span></div>
+        <p className="decision-reason"><b>Why the AI recommends this.</b> {recommendationReason(r.priority, r.confidence, thresholds)}</p>
         <p className="mt-3 text-[11px] text-ink-3">{draftLabel(r.generated_by)}</p>
         <p className="mt-1 text-[11px] text-ink-3">Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</p>
       </header>
@@ -136,6 +139,11 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
                 {Object.entries(hidden).map(([m, n]) => `${n} comment${n === 1 ? "" : "s"} from ${MARKET_LABEL[m] ?? m}`).join(", ")} restricted to
                 {" "}{Object.keys(hidden).length > 1 ? "those markets'" : "that market's"} product managers and the head of product. This access was logged.
               </p>
+            )}
+            {representation.length > 0 && (
+              <div className="mb-4 border-l-2 border-validate bg-validate-soft px-4 py-3 text-[13px]">
+                <b>Missing market representation.</b> {representation.join(" ")}
+              </div>
             )}
             {supports.length === 0 && hiddenTotal === 0 && <p className="text-[14px] text-ink-3">No customer comments. This requirement rests on survey evidence only.</p>}
             <ul className="flex flex-col gap-4">{supports.slice(0, 8).map((q) => <QuoteItem key={q.id} q={q} />)}</ul>
