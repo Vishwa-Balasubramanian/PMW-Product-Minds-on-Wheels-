@@ -111,7 +111,7 @@ export function WorkflowBoard({ cards, filters, query, basePath, vehicles, regio
                   <td><Link href={openHref(c.id)} scroll={false} className="board-list-title">{c.title}</Link><span className="font-mono">{c.id}</span></td>
                   <td>{c.vehicle}</td>
                   <td>{STATUS_LABEL[c.status]}</td>
-                  <td>{REC_LABEL[c.quadrant]}{c.kind === "quick_win" ? " · Quick win" : ""}</td>
+                  <td>{REC_LABEL[c.quadrant]}{c.kind === "quick_win" ? " · Quick win" : c.kind === "market_conflict" ? " · Market conflict" : ""}</td>
                   <td className="num">{c.priority}</td>
                   <td className="num">{c.confidence}</td>
                   <td className="num">{c.comments ?? "Survey only"}</td>
@@ -198,6 +198,7 @@ export function WorkflowBoard({ cards, filters, query, basePath, vehicles, regio
               <option value="">All</option>
               {(Object.keys(REC_LABEL) as Quadrant[]).map((q) => <option key={q} value={q}>{REC_LABEL[q]}</option>)}
               <option value="quick">Quick wins</option>
+              <option value="conflict">Market conflicts</option>
             </select>
           </label>
           <label>Sort
@@ -249,9 +250,10 @@ function Card({ c, threshold, openHref, menuOpen, dragging, onDragStart, onDragE
       </dl>
       <p className="board-card-rec">AI recommendation: <b className={`rec-${c.quadrant}`}>{QUADRANT[c.quadrant].label}</b></p>
       <p className="board-card-evidence">{c.comments === null ? "Survey evidence only" : `${c.comments.toLocaleString("en-US")} customer comment${c.comments === 1 ? "" : "s"}`}</p>
-      {(weak || c.representation.length > 0 || c.challenged || c.kind === "quick_win") && (
+      {(weak || c.representation.length > 0 || c.challenged || c.kind === "quick_win" || c.kind === "market_conflict") && (
         <ul className="board-card-flags">
           {c.kind === "quick_win" && <li className="flag-quick">Quick win</li>}
+          {c.kind === "market_conflict" && <li className="flag-conflict" title="China and Europe rate this differently: decide global or market-specific">Market conflict</li>}
           {weak && <li className="flag-warn" title={`Confidence below ${threshold}`}>Weak evidence</li>}
           {c.representation.length > 0 && <li className="flag-muted" title={c.representation.join(" ")}>Market underrepresented</li>}
           {c.challenged && <li className="flag-challenge">Challenged</li>}

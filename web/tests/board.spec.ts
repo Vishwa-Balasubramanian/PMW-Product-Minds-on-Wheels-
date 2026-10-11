@@ -140,3 +140,32 @@ test('board fits a mobile screen and the drawer works there', async ({ page }) =
   await page.getByRole('link', { name: 'Close requirement panel' }).last().click();
   await expect(drawer).toHaveCount(0);
 });
+
+test('market conflicts are flagged on cards and have their own filter', async ({ page }) => {
+  await region(page, 'ALL');
+  const ids = read<{ id: string }>("SELECT id FROM requirements WHERE kind='market_conflict'").map(r => r.id).sort();
+  expect(ids.length).toBeGreaterThan(0);
+  await page.goto('/board?rec=conflict');
+  const shown = await page.locator('[data-card-id]').evaluateAll(els => els.map(e => e.getAttribute('data-card-id')!));
+  expect(shown.sort()).toEqual(ids);
+  for (const id of ids) await expect(card(page, id).getByText('Market conflict', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'AI recommendation' })).toHaveValue('conflict');
+});
+
+test('compact happiness meter shows unknown for China and moves when a requirement is approved', async ({ page }) => {
+  await region(page, 'ALL');
+  await page.goto('/vehicles/G70?view=decisions');
+  const meter = page.getByTestId('happiness-compact');
+  await expect(meter.getByTestId('happiness-compact-CN')).toContainText('unknown');
+  const us = async () => parseFloat((await meter.getByTestId('happiness-compact-US').textContent())!.replace(/[^0-9.]/g, ''));
+  const before = await us();
+  const r = read<{ id: string }>("SELECT r.id FROM requirements r WHERE r.vehicle='G70' AND r.kind='signal' AND r.status='proposed' AND r.markets LIKE '%\"US\"%' ORDER BY r.priority DESC LIMIT 1")[0];
+  try {
+    const res = await page.request.post(`/api/requirements/${r.id}`, { data: { action: 'approve', rationale: 'Compact meter test' } });
+    expect(res.ok()).toBeTruthy();
+    await page.reload();
+    expect(await us()).toBeGreaterThan(before);
+  } finally {
+    await page.request.post(`/api/requirements/${r.id}`, { data: { action: 'reopen' } });
+  }
+});

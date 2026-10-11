@@ -78,7 +78,7 @@ export type BoardFilters = {
   vehicle: string; // "all" or a vehicle code
   moscow: string | null; // must | should | could | wont
   conf: ConfidenceLevel | null;
-  rec: Quadrant | "quick" | null;
+  rec: Quadrant | "quick" | "conflict" | null;
   q: string;
   sort: SortKey;
   layout: "board" | "list";
@@ -90,7 +90,7 @@ export function applyFilters(cards: BoardCard[], f: BoardFilters, threshold: num
     (f.vehicle === "all" || c.vehicle === f.vehicle)
     && (!f.moscow || moscowFor(c.priority).key === f.moscow)
     && (!f.conf || confidenceLevel(c.confidence, threshold) === f.conf)
-    && (!f.rec || (f.rec === "quick" ? c.kind === "quick_win" : c.quadrant === f.rec))
+    && (!f.rec || (f.rec === "quick" ? c.kind === "quick_win" : f.rec === "conflict" ? c.kind === "market_conflict" : c.quadrant === f.rec))
     && (!q || c.title.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)));
   const by: Record<SortKey, (a: BoardCard, b: BoardCard) => number> = {
     priority: (a, b) => b.priority - a.priority || b.confidence - a.confidence,

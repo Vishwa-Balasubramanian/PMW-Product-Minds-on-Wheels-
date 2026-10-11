@@ -295,12 +295,26 @@ b, strong { font-weight: 700; }
 @media (max-width: 1023px) {
   .board-content { padding: 16px; }
   .board-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .board-side { display: grid; position: static; width: auto; padding: 0; background: none; border: 0; }
+  .board-side { display: grid; position: relative; z-index: 0; width: auto; padding: 0; background: none; border: 0; }
   .board-columns { grid-template-columns: repeat(5, minmax(240px, 82vw)); }
 }
 .board-kpis > div + div { border-top: 0; border-left: 1px solid var(--color-line); }
 .board-cards { max-height: min(70vh, 720px); padding-bottom: 8px; }
 @media (max-width: 1023px) { .board-kpis > div:nth-child(3) { border-left: 0; } .board-kpis > div:nth-child(n+3) { border-top: 1px solid var(--color-line); } }
 /* Drawer sits below our 72px header and beside the 220px sidebar (phones: full width). */
-.drawer-root { inset: 72px 0 0 220px; }
+.drawer-root { inset: 72px 0 0 220px; z-index: 55; } /* above the board, its filters and the header; below the voice mic */
 @media (max-width: 1023px) { .drawer-root { inset: 72px 0 0 0; } }
+/* Board card flags and AI-recommendation colours (from feature_v, missed in the first port). */
+.rec-act { color: var(--color-act); }
+.rec-validate { color: var(--color-validate); }
+.rec-monitor { color: var(--color-monitor); }
+.rec-park { color: var(--color-park); }
+.flag-warn { background: var(--color-validate-soft); color: var(--color-validate); }
+.flag-quick { border: 1px solid var(--color-blue); color: var(--color-blue); }
+.flag-conflict { border: 1px solid var(--color-validate); color: var(--color-validate); }
+.flag-challenge, .flag-muted { background: var(--color-mist); color: var(--color-ink-2); }
+.board-card.rec-line-act::before { background: var(--color-act); }
+.board-card.rec-line-validate::before { background: var(--color-validate); }
+.board-card.rec-line-monitor::before { background: var(--color-blue); }
+.board-card.rec-line-park::before { background: var(--color-park); }
+@media (max-width: 1023px) { .drawer-panel { left: 0; width: auto; border-left: 0; } }

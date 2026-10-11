@@ -1,8 +1,9 @@
 import { DecisionCard } from "@/components/DecisionCard";
+import { HappinessCompact, combineHappiness } from "@/components/HappinessCompact";
 import { RequirementDrawer } from "@/components/RequirementDrawer";
 import { WorkflowBoard } from "@/components/WorkflowBoard";
 import { SORTS, applyFilters, type BoardFilters, type ConfidenceLevel, type SortKey } from "@/lib/board";
-import { auditFor, boardCards, getActiveWeights, getFactorLabels, getRequirement, getWeights, listRequirements, vehicleNames, type Viewer } from "@/lib/gate";
+import { auditFor, boardCards, happiness, getActiveWeights, getFactorLabels, getRequirement, getWeights, listRequirements, vehicleNames, type Viewer } from "@/lib/gate";
 import { MOSCOW } from "@/lib/moscow";
 import { presetLabel } from "@/lib/score";
 import { QUADRANT, type Quadrant } from "@/lib/types";
@@ -26,7 +27,7 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
     vehicle,
     moscow: MOSCOW.some((m) => m.key === sp.priority) ? one(sp.priority) : null,
     conf: ["high", "medium", "low"].includes(one(sp.conf)) ? (one(sp.conf) as ConfidenceLevel) : null,
-    rec: sp.rec === "quick" ? "quick" : Object.hasOwn(QUADRANT, one(sp.rec)) ? (one(sp.rec) as Quadrant) : null,
+    rec: sp.rec === "quick" || sp.rec === "conflict" ? sp.rec : Object.hasOwn(QUADRANT, one(sp.rec)) ? (one(sp.rec) as Quadrant) : null,
     q: one(sp.search).slice(0, 100),
     sort: Object.hasOwn(SORTS, one(sp.sort)) ? (one(sp.sort) as SortKey) : "priority",
     layout: sp.layout === "list" ? "list" : "board",
@@ -36,6 +37,8 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
   const scoped = cards.filter((c) => vehicle === "all" || c.vehicle === vehicle);
   const count = (...s: string[]) => scoped.filter((c) => s.includes(c.status)).length;
   const shown = applyFilters(cards, filters, threshold);
+  const meterScope = vehicle === "all" ? scope : scope.filter((v) => v.code === vehicle);
+  const pain = combineHappiness(await Promise.all(meterScope.map((v) => happiness(viewer, v.code))));
 
   const query = new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : [])),
@@ -70,14 +73,15 @@ export async function BoardWorkspace({ sp, viewer, basePath, fixedVehicle, headi
             {selected?.thin && <p className="board-availability"><b>Thin evidence.</b> No customer comments from {viewer.label} for the {selected.name}. Requirements rest on survey means only.</p>}
           </div>
         }
-        summary={
+        summary={<>
           <dl className="board-kpis" aria-label="Requirement counts">
             <div><dt>Awaiting Review</dt><dd className="text-blue">{fmt(count("proposed", "edited"))}</dd></div>
             <div><dt>Needs Validation</dt><dd>{fmt(count("validate"))}</dd></div>
             <div><dt>Approved</dt><dd>{fmt(count("approved"))}</dd></div>
             <div><dt>Total Requirements</dt><dd>{fmt(scoped.length)}</dd></div>
           </dl>
-        }
+          <HappinessCompact rows={pain} scope={selected ? selected.name : "All vehicles"} />
+        </>}
       />
       {inScope && (
         <RequirementDrawer closeHref={closeHref} title={`${detail.requirement.id}: ${detail.requirement.title}`}>
