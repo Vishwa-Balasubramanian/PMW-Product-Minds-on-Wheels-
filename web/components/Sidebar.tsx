@@ -16,6 +16,7 @@ const GROUPS = [
   {
     label: "Workspace",
     items: [
+      { href: "/board", label: "Requirements board" },
       { href: "/portfolio", label: "Cross-Model Radar" },
       { href: "/workflow", label: "Workflow" },
       { href: "/audit", label: "Audit trail" },

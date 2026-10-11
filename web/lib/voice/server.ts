@@ -126,7 +126,7 @@ export async function executeVoiceTool(viewer: Viewer, tool: VoiceTool, params: 
       const view = VEHICLE_VIEWS.find((v) => v === params.view) ?? "inbox";
       return { ok: true, summary: `Opened ${code} (${view}).`, confidence: NOT_APPLICABLE, sources: [], href: `/vehicles/${code}?view=${view}` };
     }
-    const href = ({ home: "/", portfolio: "/portfolio", workflow: "/workflow", audit: "/audit" } as Record<string, string>)[page];
+    const href = ({ home: "/", board: "/board", portfolio: "/portfolio", workflow: "/workflow", audit: "/audit" } as Record<string, string>)[page];
     if (!href) throw new Error("Unknown page.");
     return { ok: true, summary: `Opened ${page}.`, confidence: NOT_APPLICABLE, sources: [], href };
   }

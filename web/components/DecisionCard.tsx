@@ -3,6 +3,7 @@ import { MARKET_LABEL } from "@/lib/regions";
 import { POWERTRAIN_LABEL, QUADRANT, SOURCE_LABEL, type AuditEvent, type Quote, type Requirement } from "@/lib/types";
 import { AlreadySellBanner } from "./AlreadySellBanner";
 import { ConflictBlock } from "./ConflictBlock";
+import { recommendationReason } from "@/lib/board";
 import { DecisionActions } from "./DecisionActions";
 import { EvidenceMeter } from "./EvidenceMeter";
 import { ReviewTabs } from "./ReviewTabs";
@@ -111,6 +112,7 @@ export function DecisionCard({ r, quotes, hidden, events, labels, thresholds, vi
           <span>· {draftLabel(r.generated_by)}</span>
           <span>· Evidence from {r.markets.map((m) => MARKET_LABEL[m] ?? m).join(", ")}</span>
         </div>
+        <p className="border-l-2 border-blue bg-monitor-soft px-3 py-2 text-[13px] text-ink-2"><b className="text-ink">Why the AI recommends this.</b> {recommendationReason(r.priority, r.confidence, thresholds)}</p>
         <AlreadySellBanner r={r} linkable={new Set([...supports.slice(0, 8), ...contradicts.slice(0, 3)].map((q) => q.id))} />
         {r.kind === "market_conflict" && (
           <ConflictBlock

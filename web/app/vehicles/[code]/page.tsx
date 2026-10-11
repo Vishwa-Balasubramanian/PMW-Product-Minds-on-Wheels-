@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DecisionBoard } from "@/components/DecisionBoard";
+import { BoardWorkspace } from "@/components/BoardWorkspace";
 import { DecisionCard } from "@/components/DecisionCard";
 import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
@@ -128,7 +128,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             </div>
           </div>
         )}
-        {view === "decisions" && <DecisionBoard viewer={viewer} vehicle={vehicle} />}
+        {view === "decisions" && <BoardWorkspace sp={sp} viewer={viewer} basePath={`/vehicles/${code}`} fixedVehicle={code} heading="h2" />}
         {view === "signals" && <Signals />}
         {view === "data" && <DataHealth />}
       </div>
