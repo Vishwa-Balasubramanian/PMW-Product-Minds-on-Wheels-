@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DecisionBoard } from "@/components/DecisionBoard";
 import { DecisionCard } from "@/components/DecisionCard";
 import { HappinessMeterCard } from "@/components/HappinessMeterCard";
 import { BoardToolbar, RequirementsBoard, requirementBoardHref } from "@/components/RequirementsBoard";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 const VIEWS = [
   { k: "inbox", label: "Requirements" },
+  { k: "decisions", label: "Decisions" },
   { k: "matrix", label: "Decision matrix" },
   { k: "signals", label: "Signals" },
   { k: "data", label: "Data health" },
@@ -126,6 +128,7 @@ export default async function VehiclePage({ params, searchParams }: PageProps<"/
             </div>
           </div>
         )}
+        {view === "decisions" && <DecisionBoard viewer={viewer} vehicle={vehicle} />}
         {view === "signals" && <Signals />}
         {view === "data" && <DataHealth />}
       </div>

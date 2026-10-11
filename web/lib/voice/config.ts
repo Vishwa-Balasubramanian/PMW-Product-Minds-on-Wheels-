@@ -14,7 +14,7 @@ export type ConfirmableAction = VoiceDecision | "challenge";
 
 export const VOICE_MODELS = ["G70", "G60", "F70"] as const;
 export const VOICE_PAGES = ["home", "portfolio", "workflow", "audit", "vehicle"] as const;
-export const VEHICLE_VIEWS = ["inbox", "matrix", "signals", "data"] as const;
+export const VEHICLE_VIEWS = ["inbox", "decisions", "matrix", "signals", "data"] as const;
 export const REQUIREMENT_FILTERS = ["all", "pending", "approved", "rejected", "act", "validate", "monitor", "park", "quick_win", "conflict", "weak_evidence"] as const;
 
 type ToolSchema = { description: string; properties: Record<string, unknown>; required: string[] };
@@ -22,7 +22,7 @@ const id = { type: "string", description: "Exact PMW requirement ID (e.g. R-G70-
 const model = { type: "string", enum: VOICE_MODELS, description: "G70 = BMW 7 Series; G60 = 5 Series; F70 = 1 Series." };
 
 export const VOICE_TOOL_SCHEMAS: Record<VoiceTool, ToolSchema> = {
-  navigate: { description: "Navigate the PMW app. home = choose a vehicle, portfolio = Cross-Model Radar, the heatmap of customer issues shared across vehicles, workflow = method, audit = audit trail, vehicle = one model (view: inbox = MoSCoW requirements board with priority weights and the decision card, matrix = decision matrix, signals, data = data health).", properties: { page: { type: "string", enum: VOICE_PAGES }, model, view: { type: "string", enum: VEHICLE_VIEWS } }, required: ["page"] },
+  navigate: { description: "Navigate the PMW app. home = choose a vehicle, portfolio = Cross-Model Radar, the heatmap of customer issues shared across vehicles, workflow = method, audit = audit trail, vehicle = one model (view: inbox = MoSCoW requirements board with priority weights and the decision card, decisions = board of requirements by decision status (to review, needs validation, edited, approved, rejected), matrix = decision matrix, signals, data = data health).", properties: { page: { type: "string", enum: VOICE_PAGES }, model, view: { type: "string", enum: VEHICLE_VIEWS } }, required: ["page"] },
   list_vehicles: { description: "List vehicle programs with comment counts, requirement counts and decisions awaiting review in the PM's region.", properties: {}, required: [] },
   find_requirements: { description: "Find requirements for a model, optionally filtered by status, decision-matrix quadrant, quick wins, market conflicts or weak evidence (confidence below the threshold), and/or a keyword. Shows the matching cards on the board, or opens the best keyword match. Returns IDs, priority, confidence and status.", properties: { model, filter: { type: "string", enum: REQUIREMENT_FILTERS }, query: { type: "string", description: "Optional keyword such as 'seat' or 'navigation'." } }, required: ["model"] },
   open_requirement: { description: "Open a requirement and return its statement, customer need, status and top evidence.", properties: { id }, required: ["id"] },
