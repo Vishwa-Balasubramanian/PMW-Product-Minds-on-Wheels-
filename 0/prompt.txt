@@ -1,0 +1,1 @@
+check if the processes that were abruptly stopped are now completed
