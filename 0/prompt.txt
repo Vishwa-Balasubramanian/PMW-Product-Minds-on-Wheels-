@@ -1,0 +1,49 @@
+<task-notification>
+<task-id>a625ce547d4fd38d9</task-id>
+<tool-use-id>toolu_016b8dJm4z59M1K2ZkirhdWj</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-speak2gokul01/c8912fd6-bd22-493f-a55e-49458fe9b7b8/tasks/a625ce547d4fd38d9.output</output-file>
+<status>completed</status>
+<summary>Agent "G2 quick wins banner and filter" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The "You already sell this" banner and the Quick wins filter are built, all checks pass, and PR #10 is open but not merged: https://github.com/Vishwa-Balasubramanian/PMW-Product-Minds-on-Wheels-/pull/10. It's one commit (`fecaecf`) on branch `gokul/quick-wins`.
+
+**What changed**
+- **Banner:** it sits under the photo header and meta line, above the decision buttons, whenever `already_exists` is non-empty. That's the 10 quick wins plus 3 ordinary requirements today.
+  - The headline is "You already sell this", or "Standard, but customers report problems" when every match is that kind.
+  - Matches are grouped by what customers asked for, e.g. "Customers ask for ventilated front seats", with one sentence per match type. A package match shows the package name, code and price, e.g. "Only inside the Comfort Paket (7VB, €2,750) on the 5 Series". "Standard on another BMW" names the car (7, 5 or 1 Series).
+  - Repeated matches are merged and comment IDs are listed once per group. An ID links to its quote when that quote is shown on the card.
+  - The footer says the source is the German price list, July 2026, and that other markets are an assumption. It uses BMW blue, thin borders, square corners and the existing colour tokens.
+- **Filter:** a "Quick wins N" chip uses `?q=quick` with `scroll={false}`. Row links keep the filter, quick-win rows get a "Quick win" badge, and the empty state says "No quick wins with evidence in …".
+- **Privacy:** the filtering is server-side in `gate.ts`. It looks up each comment ID's market in `feedback`, keeps only the viewer's markets, and records an optional `hidden_count`. IDs it can't find are treated as hidden.
+  - It runs in both `getRequirement` and `listRequirements`. `getRequirement` matters because the requirement is passed to the client component `DecisionActions`, so unfiltered IDs would end up in its props. `listRequirements` also feeds the export.
+  - Head of product (ALL) sees every ID.
+- **No database schema change.** `types.ts` gets one optional field, `hidden_count?`, which is computed and never stored; `db.py` is untouched.
+
+**Files:** `web/components/AlreadySellBanner.tsx` (new), `web/components/DecisionCard.tsx`, `web/components/ui.tsx`, `web/app/vehicles/[code]/page.tsx`, `web/lib/gate.ts`, `web/lib/types.ts`, `web/tests/workflow.spec.ts`.
+
+**Tests**
+- Pipeline: `pmw build` and `pmw verify` passed, and pytest ran 43 passed.
+- Web: tsc and eslint are clean, and `npm run build` passes.
+- Playwright: 16 passed, the 15 existing plus 1 new one. The new test covers the chip count and listed rows, the 7VB €2,750 text, and that the ROW comment ID appears neither in the banner nor in the client props.
+- curl on the 5 Series ventilated-seats quick win:
+
+| Region | Comment IDs shown | Note in banner |
+|---|---|---|
+| ALL | G60-0532, G60-3619, G60-3621 | none |
+| US | G60-0532, G60-3619 | 1 comment from other markets hidden |
+| ROW | G60-3621 | 2 comments hidden |
+| EU, CN | can't open this requirement (no evidence in their region) | |
+
+- On a requirement CN can open, the banner shows no IDs, only the hidden counts.
+- 5 Series Quick wins chip counts: ALL 5, US 5, ROW 1, EU 0, CN 0.
+- At 375px and 1440px the page doesn't scroll sideways and there are no page errors. The only elements wider than the screen sit inside the tab bar, which already scrolled sideways before this change.
+
+**Things I was unsure about or noticed**
+- The "standard but failing" wording can't be seen with today's data. Those 10 matches exist in `equipment_matches` but none is attached to a requirement.
+- Separate from this change: the audit trail on quick wins shows comment IDs from every market. For example, a US viewer sees the ROW comment G60-3621 in the AI event's rationale ("3 wishing customer comments: …"). It's IDs only, no comment text, and I flagged it in the PR rather than fixing it here.
+- If one comment backs two signals for the same customer wish, the hidden count could count it twice. That doesn't happen in today's data.
+- The PR has no screenshots yet, although the brief asks for desktop and 375px ones. I checked both sizes locally, but the images can't be attached through the `gh` command line.
+- I left the co-author line off the commit and the PR, as you asked, even though a system message asked for it.</result>
+<usage><subagent_tokens>147925</subagent_tokens><tool_uses>54</tool_uses><duration_ms>409386</duration_ms></usage>
+<worktree><worktreePath>/Users/speak2gokul01/Documents/Intern applications/BMW Hackathon/pmw/.claude/worktrees/agent-a625ce547d4fd38d9</worktreePath><worktreeBranch>worktree-agent-a625ce547d4fd38d9</worktreeBranch></worktree>
+</task-notification>
