@@ -158,24 +158,35 @@ function restrictRawEvidence(viewer: Viewer, r: Requirement): Requirement {
 }
 
 /**
- * Equipment matches ("you already sell this") cite supporting comment IDs. Keep only the IDs from markets the viewer
- * may see and record how many were removed, so restricted IDs never reach page or client component props.
- * An ID that is not found in `feedback` counts as hidden.
+ * Comment IDs from markets outside the viewer's region never reach page or client component props:
+ * - equipment matches ("you already sell this") keep only visible IDs and record how many were removed;
+ * - pipeline-written text (root cause, need, requirement, assumptions, uncertainties, contradictions, challenge)
+ *   can cite IDs, which are replaced with "[comment from <market>]".
+ * An ID that is not found in `feedback` counts as hidden in matches and is left as is in text.
  */
+const ID_RE = /\b[A-Z][0-9]{2}-\d{4}\b/g;
+const textIds = (r: Requirement) => [r.root_cause, r.customer_need, r.requirement, ...r.assumptions, ...r.uncertainties, ...r.contradictions,
+  r.challenge.narrative ?? "", ...r.challenge.issues.map((i) => i.text)].join(" ").match(ID_RE) ?? [];
 async function restrictMatchIds(viewer: Viewer, reqs: Requirement[]): Promise<Requirement[]> {
   if (viewer.region === "ALL") return reqs;
-  const ids = [...new Set(reqs.flatMap((r) => r.already_exists.flatMap((m) => m.feedback_ids)))];
+  const ids = [...new Set(reqs.flatMap((r) => [...r.already_exists.flatMap((m) => m.feedback_ids), ...textIds(r)]))];
   if (!ids.length) return reqs;
   const rows = await all<{ id: string; market: string }>(`SELECT id, market FROM feedback WHERE id IN ${inList(ids)}`, ids);
   const marketOf = new Map(rows.map((r) => [r.id, r.market]));
   const visible = (id: string) => viewer.markets.includes(marketOf.get(id) as Market);
-  return reqs.map((r) => r.already_exists.length === 0 ? r : {
+  const redact = <T extends string | null | undefined>(t: T): T => (typeof t === "string"
+    ? t.replace(ID_RE, (id) => (marketOf.has(id) && !visible(id) ? `[comment from ${MARKET_LABEL[marketOf.get(id)!] ?? "another market"}]` : id))
+    : t) as T;
+  return reqs.map((r) => ({
     ...r,
+    root_cause: redact(r.root_cause), customer_need: redact(r.customer_need), requirement: redact(r.requirement),
+    assumptions: r.assumptions.map(redact), uncertainties: r.uncertainties.map(redact), contradictions: r.contradictions.map(redact),
+    challenge: { ...r.challenge, narrative: redact(r.challenge.narrative), issues: r.challenge.issues.map((i) => ({ ...i, text: redact(i.text) })) },
     already_exists: r.already_exists.map((m) => {
       const keep = m.feedback_ids.filter(visible);
       return { ...m, feedback_ids: keep, hidden_count: m.feedback_ids.length - keep.length };
     }),
-  });
+  }));
 }
 
 export async function listRequirements(viewer: Viewer, vehicle: string): Promise<Requirement[]> {
